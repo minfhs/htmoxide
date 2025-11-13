@@ -1,33 +1,56 @@
 use axum::{
     response::{IntoResponse, Response},
-    http::StatusCode,
+    http::{StatusCode, HeaderValue},
 };
 use maud::{Markup, Render};
 
 /// Response type for component partial renders
 #[derive(Debug, Clone)]
-pub struct Html(pub Markup);
+pub struct Html {
+    pub markup: Markup,
+    pub push_url: Option<String>,
+}
 
 impl From<Markup> for Html {
     fn from(markup: Markup) -> Self {
-        Html(markup)
+        Html { markup, push_url: None }
+    }
+}
+
+impl Html {
+    pub fn new(markup: Markup) -> Self {
+        Html { markup, push_url: None }
+    }
+
+    pub fn with_push_url(mut self, url: String) -> Self {
+        self.push_url = Some(url);
+        self
     }
 }
 
 impl Render for Html {
     fn render(&self) -> Markup {
-        self.0.clone()
+        self.markup.clone()
     }
 }
 
 impl IntoResponse for Html {
     fn into_response(self) -> Response {
-        (
+        let mut response = (
             StatusCode::OK,
             [("Content-Type", "text/html; charset=utf-8")],
-            self.0.into_string(),
+            self.markup.into_string(),
         )
-            .into_response()
+            .into_response();
+
+        // Add HX-Push-Url header if specified
+        if let Some(push_url) = self.push_url {
+            if let Ok(header_value) = HeaderValue::from_str(&push_url) {
+                response.headers_mut().insert("HX-Push-Url", header_value);
+            }
+        }
+
+        response
     }
 }
 

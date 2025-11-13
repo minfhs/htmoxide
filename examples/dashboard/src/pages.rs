@@ -1,33 +1,36 @@
 use htmoxide::prelude::*;
 use axum::Extension;
 use axum::extract::Query;
+use axum::response::{IntoResponse, Redirect};
 use std::sync::Arc;
 
-use crate::layout::{head, header, navbar, common_styles};
+use crate::layout::{head, header, navbar};
 use crate::components::*;
 use crate::state::AppState;
+use crate::auth::AuthSession;
 
-pub async fn index() -> Page {
+pub async fn index(auth_session: AuthSession) -> Page {
+    let user = &auth_session.user;
+    let username = user.as_ref().map(|u| u.name.as_str());
+    
     html! {
-        head {
-            title { "htmoxide Demo" }
-            script src="https://unpkg.com/htmx.org@1.9.10" {}
-            (common_styles())
-        }
+        (head("htmoxide Demo"))
         body {
-            (header())
-            (navbar(""))
+            (header(username))
+            (navbar("home"))
 
-            div.components {
-                p { "Welcome to htmoxide! Choose a demo from the navigation above." }
-                ul {
-                    li {
-                        a href="/simple" { "Simple Demo" }
-                        " - Counter and greeter components with URL state"
-                    }
-                    li {
-                        a href="/users" { "User Table" }
-                        " - Sortable and filterable user table"
+            main.container {
+                div.components {
+                    p { "Welcome to htmoxide! Choose a demo from the navigation above." }
+                    ul {
+                        li {
+                            a href="/simple" { "Simple Demo" }
+                            " - Counter and greeter components with URL state"
+                        }
+                        li {
+                            a href="/users" { "User Table" }
+                            " - Sortable and filterable user table"
+                        }
                     }
                 }
             }
@@ -36,7 +39,12 @@ pub async fn index() -> Page {
     .into()
 }
 
-pub async fn simple_page(Query(params): Query<std::collections::HashMap<String, String>>) -> Page {
+pub async fn simple_page(
+    auth_session: AuthSession,
+    Query(params): Query<std::collections::HashMap<String, String>>
+) -> Page {
+    let user = &auth_session.user;
+    let username = user.as_ref().map(|u| u.name.as_str());
     // Build query string from params
     let query_string = serde_urlencoded::to_string(&params).unwrap_or_default();
 
@@ -51,12 +59,14 @@ pub async fn simple_page(Query(params): Query<std::collections::HashMap<String, 
     html! {
         (head("Simple Demo - htmoxide"))
         body {
-            (header())
+            (header(username))
             (navbar("simple"))
 
-            div.components {
-                (counter(counter_state, counter_url).await)
-                (greeter(greeter_state, greeter_url).await)
+            main.container {
+                div.components {
+                    (counter(counter_state, counter_url).await)
+                    (greeter(greeter_state, greeter_url).await)
+                }
             }
         }
     }
@@ -64,8 +74,17 @@ pub async fn simple_page(Query(params): Query<std::collections::HashMap<String, 
 }
 
 pub async fn users_page(
+    auth_session: AuthSession,
     req: axum::http::Request<axum::body::Body>,
-) -> Page {
+) -> impl IntoResponse {
+    // Require authentication for this page
+    let user = match &auth_session.user {
+        Some(user) => user,
+        None => return Redirect::to("/login?redirect=/users").into_response(),
+    };
+    
+    let username = Some(user.name.as_str());
+    
     // Extract app state from extensions
     let app_state = req.extensions()
         .get::<Arc<AppState>>()
@@ -76,17 +95,24 @@ pub async fn users_page(
     let user_table_state: UserTableState = serde_urlencoded::from_str(query_string).unwrap_or_default();
     let user_table_url = UrlBuilder::new("/user_table", query_string).with_main_page("/users");
 
-    html! {
+    // Clone auth_session since we need it in two places
+    let auth_for_component = auth_session.clone();
+    
+    let page: Page = html! {
         (head("User Table - htmoxide"))
         body {
-            (header())
+            (header(username))
             (navbar("users"))
 
-            div.components {
-                // Render the user table component directly with shared state
-                (user_table(user_table_state, user_table_url, Extension(app_state)).await)
+            main.container {
+                div.components {
+                    // Render the user table component directly with shared state
+                    (user_table(user_table_state, user_table_url, auth_for_component, Extension(app_state)).await)
+                }
             }
         }
     }
-    .into()
+    .into();
+    
+    page.into_response()
 }

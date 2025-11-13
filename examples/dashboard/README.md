@@ -35,6 +35,6 @@ src/
 ## Key Concepts
 
 - **Component State** - Each component has serializable state in URL query params
-- **URL Builder** - Automatic state merging for component interactions  
+- **URL Builder** - Automatic state merging for component interactions
 - **App State** - Shared application state via `Extension<Arc<AppState>>`
 - **Server-side Rendering** - Components render on server, htmx updates DOM

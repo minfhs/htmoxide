@@ -16,3 +16,7 @@ tokio.workspace = true
 maud.workspace = true
 serde.workspace = true
 serde_urlencoded.workspace = true
+urlencoding = "2.1"
+tower-sessions = "0.14"
+axum-login = "0.18"
+async-trait = "0.1"

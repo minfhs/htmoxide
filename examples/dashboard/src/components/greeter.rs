@@ -15,15 +15,19 @@ pub async fn greeter(state: GreeterState, url: UrlBuilder) -> Html {
     };
 
     let markup = html! {
-        div id="greeter" {
-            h2 { (greeting) }
+        article id="greeter" {
+            header {
+                h3 { (greeting) }
+            }
             form hx-get=(url.clone().build())
                  hx-target="#greeter"
                  hx-swap="outerHTML"
                  hx-include="#counter"
                  hx-trigger="submit" {
-                input type="text" name="name" value=(state.name) placeholder="Enter your name";
-                button type="submit" { "Greet" }
+                fieldset role="group" {
+                    input type="text" name="name" value=(state.name) placeholder="Enter your name";
+                    button type="submit" { "Greet" }
+                }
             }
         }
     };

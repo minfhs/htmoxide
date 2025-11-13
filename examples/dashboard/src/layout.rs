@@ -3,121 +3,96 @@ use htmoxide::prelude::*;
 pub fn head(title: &str) -> Markup {
     html! {
         head {
+            meta charset="utf-8";
+            meta name="viewport" content="width=device-width, initial-scale=1";
             title { (title) }
+            link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css";
             script src="https://unpkg.com/htmx.org@1.9.10" {}
-            (common_styles())
+            (custom_styles())
         }
     }
 }
 
-pub fn header() -> Markup {
+pub fn header(username: Option<&str>) -> Markup {
     html! {
-        div.header {
-            h1 { "htmoxide Demo" }
-            p { "A Rust framework for building htmx applications" }
+        header.container {
+            hgroup {
+                h1 { "htmoxide Demo" }
+                p { "A Rust framework for building htmx applications" }
+            }
+            @if let Some(name) = username {
+                p { 
+                    "Logged in as: " strong { (name) } " | " 
+                    a href="/logout" role="button" class="secondary outline" { "Logout" } 
+                }
+            } @else {
+                p { "Visiting as guest. " a href="/login" role="button" class="secondary outline" { "Login" } }
+            }
         }
     }
 }
 
 pub fn navbar(current_page: &str) -> Markup {
     html! {
-        nav {
-            a href="/simple" class=(if current_page == "simple" { "active" } else { "" }) {
-                "Simple Demo"
-            }
-            " | "
-            a href="/users" class=(if current_page == "users" { "active" } else { "" }) {
-                "User Table"
+        nav.container {
+            ul {
+                li { 
+                    a href="/" class=(if current_page == "home" { "contrast" } else { "" }) {
+                        "Home"
+                    }
+                }
+                li { 
+                    a href="/simple" class=(if current_page == "simple" { "contrast" } else { "" }) {
+                        "Simple Demo"
+                    }
+                }
+                li { 
+                    a href="/users" class=(if current_page == "users" { "contrast" } else { "" }) {
+                        "User Table"
+                    }
+                }
             }
         }
     }
 }
 
-pub fn common_styles() -> Markup {
+pub fn custom_styles() -> Markup {
     html! {
         style {
             r#"
-            body {
-                font-family: system-ui, -apple-system, sans-serif;
-                max-width: 1000px;
-                margin: 0 auto;
-                padding: 2rem;
-            }
-            .header {
-                margin-bottom: 1rem;
-            }
-            nav {
-                margin: 1rem 0 2rem 0;
-                padding: 1rem;
-                background: #f5f5f5;
-                border-radius: 8px;
-            }
-            nav a {
-                text-decoration: none;
-                color: #0066cc;
-                padding: 0.5rem 1rem;
-                border-radius: 4px;
-            }
-            nav a.active {
-                background: #0066cc;
-                color: white;
-            }
-            nav a:hover:not(.active) {
-                background: #e0e0e0;
-            }
+            /* Minor tweaks for htmoxide components */
             .components {
-                display: grid;
-                gap: 2rem;
                 margin-top: 2rem;
             }
             #counter, #greeter, #user-table {
-                border: 2px solid #ddd;
-                padding: 1.5rem;
-                border-radius: 8px;
-            }
-            button {
-                margin: 0.5rem 0.5rem 0 0;
-                padding: 0.5rem 1rem;
-                font-size: 1rem;
-                cursor: pointer;
-                background: #fff;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-            }
-            button:hover {
-                background: #f5f5f5;
-            }
-            input[type="text"] {
-                padding: 0.5rem;
-                font-size: 1rem;
-                margin-right: 0.5rem;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 1rem;
-            }
-            th, td {
-                padding: 0.75rem;
-                text-align: left;
-                border-bottom: 1px solid #ddd;
-            }
-            th {
-                background: #f5f5f5;
-                font-weight: 600;
+                margin-bottom: 2rem;
             }
             .sort-button {
-                margin: 0;
-                padding: 0;
                 background: none;
                 border: none;
+                padding: 0;
                 font-weight: 600;
                 cursor: pointer;
+                color: var(--pico-primary);
             }
             .sort-button:hover {
-                background: #e0e0e0;
+                text-decoration: underline;
+            }
+            .error {
+                padding: 1rem;
+                border-radius: var(--pico-border-radius);
+                background-color: var(--pico-del-background-color);
+                color: var(--pico-del-color);
+            }
+            nav ul {
+                display: flex;
+                gap: 1rem;
+            }
+            header.container p a[role="button"] {
+                display: inline-block;
+                padding: 0.25rem 0.75rem;
+                font-size: 0.875rem;
+                margin-left: 0.5rem;
             }
             "#
         }

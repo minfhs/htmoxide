@@ -13,11 +13,13 @@ pub async fn counter(state: CounterState, url: UrlBuilder) -> Html {
     let reset_url = url.clone().with_params([("count", 0)]);
 
     let markup = html! {
-        div id="counter" {
+        article id="counter" {
             // Hidden input so other components can include this value
             input type="hidden" name="count" value=(state.count);
 
-            h2 { "Counter: " (state.count) }
+            header {
+                h3 { "Counter: " (state.count) }
+            }
             button hx-get=(increment_url.build())
                    hx-target="#counter"
                    hx-swap="outerHTML" {
@@ -25,12 +27,14 @@ pub async fn counter(state: CounterState, url: UrlBuilder) -> Html {
             }
             button hx-get=(decrement_url.build())
                    hx-target="#counter"
-                   hx-swap="outerHTML" {
+                   hx-swap="outerHTML"
+                   class="secondary" {
                 "Decrement"
             }
             button hx-get=(reset_url.build())
                    hx-target="#counter"
-                   hx-swap="outerHTML" {
+                   hx-swap="outerHTML"
+                   class="outline" {
                 "Reset"
             }
         }

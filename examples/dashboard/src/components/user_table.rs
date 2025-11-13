@@ -1,5 +1,6 @@
 use htmoxide::prelude::*;
 use crate::state::AppStateExt;
+use crate::auth::AuthSession;
 
 #[derive(Deserialize, Serialize, Default, Clone, Debug)]
 pub struct UserTableState {
@@ -12,9 +13,19 @@ pub struct UserTableState {
 #[component]
 pub async fn user_table(
     state: UserTableState, 
-    url: UrlBuilder, 
+    url: UrlBuilder,
+    auth_session: AuthSession,
     app_state: AppStateExt
 ) -> Html {
+    // Require authentication for this component
+    if auth_session.user.is_none() {
+        return Html::new(html! {
+            div.error {
+                p { "Please " a href="/login" { "log in" } " to view the user table." }
+            }
+        });
+    }
+    
     let app_state = &**app_state;
     // Get users from shared state
     let mut users = app_state.users.lock().unwrap().clone();
@@ -53,33 +64,42 @@ pub async fn user_table(
     let request_count = app_state.request_count.lock().unwrap();
 
     let markup = html! {
-        div id="user-table" {
+        article id="user-table" {
             // Only include filter in hidden inputs for sort buttons to pick up
             // Don't include sort as hidden input to avoid conflicts
             div id="user-table-filter-state" {
                 input type="hidden" name="filter" value=(state.filter);
             }
 
-            h2 { "User Table" }
-            p.text-muted { "Request count: " (request_count) " | Users in database: " (app_state.users.lock().unwrap().len()) }
+            header {
+                h2 { "User Table" }
+                p { 
+                    small { 
+                        "Request count: " (request_count) " | Users in database: " (app_state.users.lock().unwrap().len()) 
+                    }
+                }
+            }
 
             form hx-get=(filter_url)
                  hx-target="#user-table"
                  hx-swap="outerHTML"
                  hx-trigger="submit" {
-                input type="text"
-                       name="filter"
-                       value=(state.filter)
-                       placeholder="Filter users...";
-                // Include current sort as hidden field in the form
-                input type="hidden" name="sort" value=(state.sort);
-                button type="submit" { "Filter" }
-                @if !state.filter.is_empty() {
-                    button hx-get=(url.clone().with_params([("filter", ""), ("sort", state.sort.as_str())]).build())
-                           hx-target="#user-table"
-                           hx-swap="outerHTML"
-                           type="button" {
-                        "Clear Filter"
+                fieldset role="group" {
+                    input type="text"
+                           name="filter"
+                           value=(state.filter)
+                           placeholder="Filter users...";
+                    // Include current sort as hidden field in the form
+                    input type="hidden" name="sort" value=(state.sort);
+                    button type="submit" { "Filter" }
+                    @if !state.filter.is_empty() {
+                        button hx-get=(url.clone().with_params([("filter", ""), ("sort", state.sort.as_str())]).build())
+                               hx-target="#user-table"
+                               hx-swap="outerHTML"
+                               type="button"
+                               class="secondary" {
+                            "Clear"
+                        }
                     }
                 }
             }

@@ -30,11 +30,11 @@ struct CounterState {
 #[component]
 async fn counter(state: CounterState, url: UrlBuilder) -> Html {
     let increment_url = url.clone().with_params([("count", state.count + 1)]);
-    
+
     html! {
         div id="counter" {
             h2 { "Count: " (state.count) }
-            button hx-get=(increment_url.build()) 
+            button hx-get=(increment_url.build())
                    hx-target="#counter" {
                 "Increment"
             }
@@ -46,7 +46,7 @@ async fn counter(state: CounterState, url: UrlBuilder) -> Html {
 async fn main() {
     let app = app()
         .page("/", index_page);
-    
+
     axum::serve(listener, app).await.unwrap();
 }
 ```

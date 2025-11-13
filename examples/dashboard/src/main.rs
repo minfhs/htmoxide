@@ -6,6 +6,7 @@ use tower_sessions::{Expiry, SessionManagerLayer};
 use tower_sessions::cookie::time::Duration;
 use tower_sessions::MemoryStore;
 use axum_login::AuthManagerLayerBuilder;
+use tower_cookies::CookieManagerLayer;
 
 mod models;
 mod state;
@@ -42,7 +43,8 @@ async fn main() {
         .route("/users", get(users_page))
         .route("/combined", get(combined_page))
         .layer(Extension(app_state))
-        .layer(auth_layer);
+        .layer(auth_layer)
+        .layer(CookieManagerLayer::new());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await

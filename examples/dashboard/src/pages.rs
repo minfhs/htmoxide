@@ -3,6 +3,7 @@ use axum::Extension;
 use axum::extract::Query;
 use axum::response::{IntoResponse, Redirect};
 use std::sync::Arc;
+use tower_cookies::Cookies;
 
 use crate::layout::{head, header, navbar};
 use crate::components::*;
@@ -45,16 +46,19 @@ pub async fn index(auth_session: AuthSession) -> Page {
 
 pub async fn simple_page(
     auth_session: AuthSession,
+    cookies: Cookies,
     Query(params): Query<std::collections::HashMap<String, String>>
 ) -> Page {
     let user = &auth_session.user;
     let username = user.as_ref().map(|u| u.name.as_str());
-    // Build query string from params
+    
+    // Use StateLoader to merge cookies and query params
+    let loader = StateLoader::new(cookies, params.clone());
+    let counter_state: CounterState = loader.load();
+    let greeter_state: GreeterState = loader.load();
+    
+    // Build query string from params for URL builders
     let query_string = serde_urlencoded::to_string(&params).unwrap_or_default();
-
-    // Extract state for each component
-    let counter_state: CounterState = serde_urlencoded::from_str(&query_string).unwrap_or_default();
-    let greeter_state: GreeterState = serde_urlencoded::from_str(&query_string).unwrap_or_default();
 
     // Create URL builders for components - they'll auto-detect page path from htmx headers
     let counter_url = UrlBuilder::new("/counter", &query_string).with_main_page("/simple");
@@ -125,6 +129,7 @@ pub async fn users_page(
 
 pub async fn combined_page(
     auth_session: AuthSession,
+    cookies: Cookies,
     req: axum::http::Request<axum::body::Body>,
 ) -> impl IntoResponse {
     // Require authentication for this page
@@ -141,17 +146,23 @@ pub async fn combined_page(
         .expect("AppState not found in extensions")
         .clone();
     
+    // Parse query string
     let query_string = req.uri().query().unwrap_or("");
+    let params: std::collections::HashMap<String, String> = 
+        serde_urlencoded::from_str(query_string).unwrap_or_default();
     
-    // Extract state for each component
-    let counter_state: CounterState = serde_urlencoded::from_str(query_string).unwrap_or_default();
-    let greeter_state: GreeterState = serde_urlencoded::from_str(query_string).unwrap_or_default();
-    let user_table_state: UserTableState = serde_urlencoded::from_str(query_string).unwrap_or_default();
+    // Use StateLoader to merge cookies and query params
+    let loader = StateLoader::new(cookies, params.clone());
+    let counter_state: CounterState = loader.load();
+    let greeter_state: GreeterState = loader.load();
+    let user_table_state: UserTableState = loader.load();
+    
+    let query_string_with_cookies = serde_urlencoded::to_string(&params).unwrap_or_default();
 
     // Create URL builders for components
-    let counter_url = UrlBuilder::new("/counter", query_string).with_main_page("/combined");
-    let greeter_url = UrlBuilder::new("/greeter", query_string).with_main_page("/combined");
-    let user_table_url = UrlBuilder::new("/user_table", query_string).with_main_page("/combined");
+    let counter_url = UrlBuilder::new("/counter", &query_string_with_cookies).with_main_page("/combined");
+    let greeter_url = UrlBuilder::new("/greeter", &query_string_with_cookies).with_main_page("/combined");
+    let user_table_url = UrlBuilder::new("/user_table", &query_string_with_cookies).with_main_page("/combined");
 
     // Clone auth_session for the user_table component
     let auth_for_component = auth_session.clone();

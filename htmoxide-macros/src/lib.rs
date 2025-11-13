@@ -162,14 +162,103 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                     .and_then(|url| url.split('?').next())
                     .map(|path| path.to_string());
 
-                // Extract state from query parameters
-                let state = match ::htmoxide::StateExtractor::<#state_type>::from_request_parts(
+                // Extract cookies for state persistence
+                let cookies = match ::htmoxide::tower_cookies::Cookies::from_request_parts(&mut parts, &()).await {
+                    Ok(c) => c,
+                    Err(_) => {
+                        // If cookies middleware is not available, component will still work
+                        // but state won't persist across sessions
+                        return ::axum::http::Response::builder()
+                            .status(500)
+                            .body(::axum::body::Body::from("Cookie middleware not configured. Add CookieManagerLayer to your app."))
+                            .unwrap()
+                            .into_response();
+                    }
+                };
+
+                // Extract state from query parameters first (URL params take priority)
+                let mut state = match ::htmoxide::StateExtractor::<#state_type>::from_request_parts(
                     &mut parts,
                     &(),
                 ).await {
                     Ok(extractor) => extractor.0,
                     Err(_) => #state_type::default(),
                 };
+                
+                // Fill in missing state fields from cookies
+                // This allows URL params to override cookie values (bookmarkability)
+                // while still providing persistence for fields not in the URL
+                if let (Ok(default_json), Ok(mut state_json)) = (
+                    ::htmoxide::serde_json::to_value(&#state_type::default()),
+                    ::htmoxide::serde_json::to_value(&state)
+                ) {
+                    if let (Some(default_obj), Some(state_obj)) = (
+                        default_json.as_object(),
+                        state_json.as_object_mut()
+                    ) {
+                        // For each field in the state
+                        for (key, default_value) in default_obj {
+                            // If the current value equals the default (not set via URL params)
+                            if let Some(current_value) = state_obj.get(key) {
+                                if current_value == default_value {
+                                    // Try to fill from cookie
+                                    if let Some(cookie) = cookies.get(key) {
+                                        let cookie_value = cookie.value();
+                                        
+                                        // Try to parse as different types
+                                        let parsed_value = if let Ok(num) = cookie_value.parse::<i64>() {
+                                            Some(::htmoxide::serde_json::Value::Number(num.into()))
+                                        } else if let Ok(num) = cookie_value.parse::<f64>() {
+                                            ::htmoxide::serde_json::Number::from_f64(num)
+                                                .map(::htmoxide::serde_json::Value::Number)
+                                        } else if let Ok(b) = cookie_value.parse::<bool>() {
+                                            Some(::htmoxide::serde_json::Value::Bool(b))
+                                        } else if !cookie_value.is_empty() {
+                                            Some(::htmoxide::serde_json::Value::String(cookie_value.to_string()))
+                                        } else {
+                                            None
+                                        };
+                                        
+                                        if let Some(val) = parsed_value {
+                                            state_obj.insert(key.clone(), val);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Deserialize back to state
+                        if let Ok(new_state) = ::htmoxide::serde_json::from_value(state_json) {
+                            state = new_state;
+                        }
+                    }
+                }
+                
+                // Save current state to cookies for persistence across sessions
+                // Serialize state and write each field as a cookie
+                if let Ok(state_json) = ::htmoxide::serde_json::to_value(&state) {
+                    if let ::htmoxide::serde_json::Value::Object(ref obj) = state_json {
+                        for (key, value) in obj {
+                            let cookie_value = if let Some(value_str) = value.as_str() {
+                                Some(value_str.to_string())
+                            } else if let Some(value_num) = value.as_i64() {
+                                Some(value_num.to_string())
+                            } else if let Some(value_num) = value.as_f64() {
+                                Some(value_num.to_string())
+                            } else if let Some(value_bool) = value.as_bool() {
+                                Some(value_bool.to_string())
+                            } else {
+                                None
+                            };
+                            
+                            if let Some(val) = cookie_value {
+                                let mut cookie = ::htmoxide::tower_cookies::Cookie::new(key.to_string(), val);
+                                cookie.set_path("/"); // Make cookie available across all paths
+                                cookies.add(cookie);
+                            }
+                        }
+                    }
+                }
 
                 // Create URL builder with main page path if available
                 let url_builder = if let Some(page_path) = main_page_path {

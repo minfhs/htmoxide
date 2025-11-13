@@ -68,6 +68,15 @@ async fn main() {
 - `htmoxide-macros/` - Procedural macros
 - `examples/dashboard/` - Comprehensive example
 
+## Built upon
+
+- [axum](https://github.com/tokio-rs/axum)
+- [maud](https://github.com/lambda-fairy/maud)
+- [tower](https://github.com/tower-rs/tower)
+- [tokio](https://github.com/tokio-rs/tokio)
+- [serde](https://github.com/serde-rs/serde)
+- and more
+
 ## License
 
 MIT

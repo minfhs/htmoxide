@@ -67,9 +67,11 @@ pub async fn simple_page(
             (navbar("simple"))
 
             main.container {
-                div.components {
-                    (counter(counter_state, counter_url).await)
-                    (greeter(greeter_state, greeter_url).await)
+                form id="page-state" {
+                    div.components {
+                        (counter(counter_state, counter_url).await)
+                        (greeter(greeter_state, greeter_url).await)
+                    }
                 }
             }
         }
@@ -161,13 +163,16 @@ pub async fn combined_page(
             (navbar("combined"))
 
             main.container {
-                div.grid {
-                    div {
-                        (counter(counter_state, counter_url).await)
-                        (greeter(greeter_state, greeter_url).await)
-                    }
-                    div {
-                        (user_table(user_table_state, user_table_url, auth_for_component, Extension(app_state)).await)
+                // Wrap all components in a form to enable easy state sharing
+                form id="page-state" {
+                    div.grid {
+                        div {
+                            (counter(counter_state, counter_url).await)
+                            (greeter(greeter_state, greeter_url).await)
+                        }
+                        div {
+                            (user_table(user_table_state, user_table_url, auth_for_component, Extension(app_state)).await)
+                        }
                     }
                 }
             }

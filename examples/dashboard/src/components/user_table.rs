@@ -54,23 +54,23 @@ pub async fn user_table(
         _ => {}
     }
 
+    // Use base component URL - parameters will come from form inputs
+    let component_path = "/user_table";
+    
+    
+    // Build URLs for sort buttons, preserving filter
     let name_sort_url = url.clone().with_params([("sort", "name")]);
     let email_sort_url = url.clone().with_params([("sort", "email")]);
     let role_sort_url = url.clone().with_params([("sort", "role")]);
-
-    // For filter form, use base component URL without params - form inputs will provide all params
-    let filter_url = UrlBuilder::new("/user_table", "").build();
+    let clear_filter_url = url.clone().with_params([("filter", "")]);
+    
+    // Get all params to preserve in filter form
+    let all_params = url.all_params();
     
     let request_count = app_state.request_count.lock().unwrap();
 
     let markup = html! {
         article id="user-table" {
-            // Only include filter in hidden inputs for sort buttons to pick up
-            // Don't include sort as hidden input to avoid conflicts
-            div id="user-table-filter-state" {
-                input type="hidden" name="filter" value=(state.filter);
-            }
-
             header {
                 h2 { "User Table" }
                 p { 
@@ -80,11 +80,10 @@ pub async fn user_table(
                 }
             }
 
-            form hx-get=(filter_url)
+            form action=(component_path)
+                 hx-get=(component_path)
                  hx-target="#user-table"
-                 hx-swap="outerHTML"
-                 hx-include="#counter, #greeter"
-                 hx-trigger="submit" {
+                 hx-swap="outerHTML" {
                 fieldset role="group" {
                     input type="text"
                            name="filter"
@@ -92,12 +91,19 @@ pub async fn user_table(
                            placeholder="Filter users...";
                     // Include current sort as hidden field in the form
                     input type="hidden" name="sort" value=(state.sort);
+                    
+                    // Hidden inputs to preserve other components' state (like count, name)
+                    @for (key, value) in all_params {
+                        @if key != "filter" && key != "sort" && !value.is_empty() {
+                            input type="hidden" name=(key) value=(value);
+                        }
+                    }
+                    
                     button type="submit" { "Filter" }
                     @if !state.filter.is_empty() {
-                        button hx-get=(url.clone().with_params([("filter", ""), ("sort", state.sort.as_str())]).build())
+                        button hx-get=(clear_filter_url.build())
                                hx-target="#user-table"
                                hx-swap="outerHTML"
-                               hx-include="#counter, #greeter"
                                type="button"
                                class="secondary" {
                             "Clear"
@@ -114,7 +120,6 @@ pub async fn user_table(
                             button hx-get=(name_sort_url.build())
                                    hx-target="#user-table"
                                    hx-swap="outerHTML"
-                                   hx-include="#user-table-filter-state, #counter, #greeter"
                                    class="sort-button" {
                                 "Name " @if state.sort == "name" { "↓" }
                             }
@@ -123,7 +128,6 @@ pub async fn user_table(
                             button hx-get=(email_sort_url.build())
                                    hx-target="#user-table"
                                    hx-swap="outerHTML"
-                                   hx-include="#user-table-filter-state, #counter, #greeter"
                                    class="sort-button" {
                                 "Email " @if state.sort == "email" { "↓" }
                             }
@@ -132,7 +136,6 @@ pub async fn user_table(
                             button hx-get=(role_sort_url.build())
                                    hx-target="#user-table"
                                    hx-swap="outerHTML"
-                                   hx-include="#user-table-filter-state, #counter, #greeter"
                                    class="sort-button" {
                                 "Role " @if state.sort == "role" { "↓" }
                             }

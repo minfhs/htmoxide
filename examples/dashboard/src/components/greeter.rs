@@ -14,22 +14,32 @@ pub async fn greeter(state: GreeterState, url: UrlBuilder) -> Html {
         format!("Hello, {}!", state.name)
     };
 
+    // Use just the component path without params - form inputs will provide params
+    let component_path = "/greeter";
+    
+    // Get all other params to preserve them in hidden inputs
+    let all_params = url.all_params();
+    
     let markup = html! {
         article id="greeter" {
-            // Hidden input so other components can include this value
-            input type="hidden" name="name" value=(state.name);
-            
             header {
                 h3 { (greeting) }
             }
-            form hx-get=(url.clone().build())
-                 hx-target="#greeter"
-                 hx-swap="outerHTML"
-                 hx-include="#counter, #user-table-filter-state"
-                 hx-trigger="submit" {
-                fieldset role="group" {
-                    input type="text" name="name" value=(state.name) placeholder="Enter your name";
-                    button type="submit" { "Greet" }
+            div {
+                input type="text" id="greeter-input" name="name" value=(state.name) placeholder="Enter your name";
+                
+                // Hidden inputs to preserve other components' state
+                @for (key, value) in all_params {
+                    @if key != "name" && !value.is_empty() {
+                        input type="hidden" name=(key) value=(value);
+                    }
+                }
+                
+                button hx-get=(component_path)
+                       hx-include="closest div"
+                       hx-target="#greeter"
+                       hx-swap="outerHTML" {
+                    "Greet"
                 }
             }
         }

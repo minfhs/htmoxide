@@ -1,4 +1,4 @@
-# htmoxide
+# HTMoXide
 
 A Rust framework for building interactive web applications with htmx.
 

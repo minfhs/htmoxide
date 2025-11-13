@@ -6,7 +6,7 @@ pub mod url_builder;
 
 pub use htmoxide_macros::component;
 pub use response::{Html, Page};
-pub use app::{App, app};
+pub use app::{app, RouterExt};
 pub use component::{Component, ComponentInfo};
 pub use state::StateExtractor;
 pub use url_builder::UrlBuilder;

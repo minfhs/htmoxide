@@ -1,105 +1,90 @@
 use axum::{
     Router,
     routing::get,
+    Extension,
 };
 use tower_http::services::ServeDir;
+use std::sync::Arc;
 
-/// Application builder
-pub struct App<S = ()> {
-    router: Router<S>,
-}
+/// Create a new application with auto-registered components
+///
+/// Returns a `Router<()>` that components are registered on.
+/// Use `.app_state()` to inject application state that components can access.
+///
+/// # Example with state
+/// ```ignore
+/// #[derive(Clone)]
+/// struct AppState {
+///     counter: Arc<Mutex<i32>>,
+/// }
+///
+/// let state = Arc::new(AppState {
+///     counter: Arc::new(Mutex::new(0)),
+/// });
+///
+/// let app = app()
+///     .app_state(state)
+///     .page("/", index);
+/// ```
+///
+/// # Example without state  
+/// ```ignore
+/// let app = app()
+///     .page("/", index);
+/// ```
+pub fn app() -> Router {
+    let mut router = Router::new();
 
-impl App<()> {
-    fn new() -> Self {
-        Self {
-            router: Router::new(),
-        }
+    // Register all components from the global registry
+    for component in inventory::iter::<crate::ComponentInfo> {
+        println!("Registering component: {} at {}", component.name, component.path);
+        let handler = component.handler;
+        router = router.route(
+            component.path,
+            get(move |req| handler(req))
+        );
     }
 
-    /// Add application state - transforms App<()> into App<S>
-    pub fn with_state<S>(mut self, state: S) -> App<S>
-    where
-        S: Clone + Send + Sync + 'static,
-    {
-        // First, register all components without state
-        for component in inventory::iter::<crate::ComponentInfo> {
-            println!("Registering component: {} at {}", component.name, component.path);
-            let handler = component.handler;
-            self.router = self.router.route(
-                component.path,
-                get(move |req| handler(req))
-            );
-        }
-
-        // Then add state
-        App {
-            router: self.router.with_state(state),
-        }
-    }
+    router
 }
 
-// Implementation for App without state
-impl App<()> {
+/// Helper trait to add features to Router
+pub trait RouterExt<S>: Sized {
     /// Add a page route
-    pub fn page<H, T>(mut self, path: &str, handler: H) -> Self
+    fn page<H, T>(self, path: &str, handler: H) -> Self
     where
-        H: axum::handler::Handler<T, ()>,
-        T: 'static,
-    {
-        self.router = self.router.route(path, get(handler));
-        self
-    }
+        H: axum::handler::Handler<T, S>,
+        T: 'static;
 
     /// Add static file serving
-    pub fn static_files(mut self, path: &str, dir: &str) -> Self {
-        self.router = self.router.nest_service(path, ServeDir::new(dir));
-        self
-    }
-
-    /// Build the final router with all registered components (no state)
-    pub fn build(mut self) -> Router {
-        // Register all components from the global registry
-        for component in inventory::iter::<crate::ComponentInfo> {
-            println!("Registering component: {} at {}", component.name, component.path);
-            let handler = component.handler;
-            self.router = self.router.route(
-                component.path,
-                get(move |req| handler(req))
-            );
-        }
-
-        self.router
-    }
+    fn static_files(self, path: &str, dir: &str) -> Self;
+    
+    /// Add application state that components can access via Extension<Arc<AppState>>
+    fn app_state<AppState>(self, state: Arc<AppState>) -> Self
+    where
+        AppState: Clone + Send + Sync + 'static;
 }
 
-// Implementation for App with state
-impl<S> App<S>
+impl<S> RouterExt<S> for Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    /// Add a page route
-    pub fn page<H, T>(mut self, path: &str, handler: H) -> Self
+    fn page<H, T>(self, path: &str, handler: H) -> Self
     where
         H: axum::handler::Handler<T, S>,
         T: 'static,
     {
-        self.router = self.router.route(path, get(handler));
-        self
+        self.route(path, get(handler))
     }
 
-    /// Add static file serving
-    pub fn static_files(mut self, path: &str, dir: &str) -> Self {
-        self.router = self.router.nest_service(path, ServeDir::new(dir));
-        self
+    fn static_files(self, path: &str, dir: &str) -> Self {
+        self.nest_service(path, ServeDir::new(dir))
     }
-
-    /// Build the final router (components already registered in with_state)
-    pub fn build(self) -> Router<S> {
-        self.router
+    
+    fn app_state<AppState>(self, state: Arc<AppState>) -> Self
+    where
+        AppState: Clone + Send + Sync + 'static,
+    {
+        self.layer(Extension(state))
     }
-}
-
-/// Create a new application builder
-pub fn app() -> App<()> {
-    App::new()
 }

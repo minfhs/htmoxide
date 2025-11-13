@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     extract::{FromRequestParts, Query},
     http::request::Parts,
 };
@@ -9,7 +8,6 @@ use serde::de::DeserializeOwned;
 #[derive(Debug, Clone)]
 pub struct StateExtractor<T>(pub T);
 
-#[async_trait]
 impl<T, S> FromRequestParts<S> for StateExtractor<T>
 where
     T: DeserializeOwned + Default,

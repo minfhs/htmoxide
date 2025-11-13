@@ -60,12 +60,10 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let block = &input_fn.block;
     let attrs = &input_fn.attrs;
 
-    // Parse all parameters to detect state, url_builder, and State<T>
+    // Parse all parameters to detect state, url_builder, and other extractors
     let mut state_type = None;
     let mut has_url_builder = false;
-    let mut has_app_state = false;
-    let mut app_state_type = None;
-    let mut additional_params = vec![];
+    let mut extractors = vec![]; // All extractors after state and url_builder
 
     for (idx, param) in sig.inputs.iter().enumerate() {
         if let syn::FnArg::Typed(pat_type) = param {
@@ -76,13 +74,9 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                 state_type = Some(&pat_type.ty);
             } else if type_name == "UrlBuilder" {
                 has_url_builder = true;
-            } else if type_name.starts_with("State<") {
-                has_app_state = true;
-                app_state_type = Some(&pat_type.ty);
-                additional_params.push(param);
             } else {
-                // Other extractors (for future auth support)
-                additional_params.push(param);
+                // Any other parameter is an extractor (Extension, State, etc.)
+                extractors.push((pat_type, &pat_type.ty));
             }
         }
     }
@@ -110,32 +104,35 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     if has_url_builder {
         call_args.push(quote! { url_builder });
     }
-    if has_app_state {
-        call_args.push(quote! { app_state });
+    // Add all extractor arguments
+    for (idx, _) in extractors.iter().enumerate() {
+        let extractor_name = syn::Ident::new(&format!("extractor_{}", idx), fn_name.span());
+        call_args.push(quote! { #extractor_name });
     }
 
     let call_component = quote! {
         let result = #fn_name(#(#call_args),*).await;
     };
 
-    // Generate app state extraction code if needed
-    let app_state_extraction = if has_app_state {
+    // Generate extraction code for all extractors
+    let extractor_extractions: Vec<_> = extractors.iter().enumerate().map(|(idx, (_pat, ty))| {
+        let extractor_name = syn::Ident::new(&format!("extractor_{}", idx), fn_name.span());
         quote! {
-            // Extract app state
-            let app_state = match #app_state_type::from_request_parts(&mut parts, &()).await {
-                Ok(s) => s,
+            // Extract additional parameter
+            let #extractor_name = match #ty::from_request_parts(&mut parts, &()).await {
+                Ok(v) => v,
                 Err(e) => {
+                    let error_msg = format!("Failed to extract parameter. Did you forget to add it via .layer()? Error: {:?}", e);
                     return ::axum::http::Response::builder()
                         .status(500)
-                        .body(format!("Failed to extract app state: {:?}", e).into())
+                        .body(::axum::body::Body::from(error_msg))
                         .unwrap()
                         .into_response();
                 }
             };
         }
-    } else {
-        quote! {}
-    };
+    }).collect();
+
 
     let output = quote! {
         // Original function
@@ -181,8 +178,8 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                     ::htmoxide::UrlBuilder::new(#route_path, &query_string)
                 };
 
-                // Extract app state if needed
-                #app_state_extraction
+                // Extract all additional extractors
+                #(#extractor_extractions)*
 
                 // Call the component function
                 #call_component

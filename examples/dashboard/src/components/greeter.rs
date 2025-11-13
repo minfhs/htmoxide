@@ -28,12 +28,8 @@ pub async fn greeter(state: GreeterState, url: UrlBuilder) -> Html {
             div {
                 input type="text" id="greeter-input" name="name" value=(state.name) placeholder="Enter your name" aria-label="Your name";
                 
-                // Hidden inputs to preserve other components' state
-                @for (key, value) in all_params {
-                    @if key != "name" && !value.is_empty() {
-                        input type="hidden" name=(key) value=(value);
-                    }
-                }
+                // Preserve other components' state
+                (preserve_params(&all_params, &["name"]))
                 
                 button hx-get=(component_path)
                        hx-include="closest div"

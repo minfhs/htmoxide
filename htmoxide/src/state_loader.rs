@@ -2,9 +2,6 @@ use serde::de::DeserializeOwned;
 use tower_cookies::Cookies;
 use std::collections::HashMap;
 
-/// Sentinel value to explicitly unset a field (clear it to empty)
-pub const UNSET_SENTINEL: &str = "__HTMOXIDE_UNSET__";
-
 /// Helper for loading component state from cookies and URL parameters
 /// 
 /// This handles the common pattern of:
@@ -57,10 +54,7 @@ impl StateLoader {
                             
                             // Then, override with query param if present
                             if let Some(query_value) = self.query_params.get(key) {
-                                if query_value == UNSET_SENTINEL {
-                                    // Explicitly unset - use empty string
-                                    current_value = serde_json::Value::String(String::new());
-                                } else if let Some(parsed) = Self::parse_value(query_value) {
+                                if let Some(parsed) = Self::parse_value(query_value) {
                                     current_value = parsed;
                                 }
                             }

@@ -1,5 +1,4 @@
 use htmoxide::prelude::*;
-use maud::PreEscaped;
 
 pub fn head(title: &str) -> Markup {
     html! {
@@ -9,22 +8,7 @@ pub fn head(title: &str) -> Markup {
             title { (title) }
             link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css";
             script src="https://unpkg.com/htmx.org@1.9.10" {}
-            script {
-                (PreEscaped(r#"
-                // Clear cookies client-side when parameters are empty
-                document.addEventListener('DOMContentLoaded', function() {
-                    document.body.addEventListener('htmx:configRequest', function(evt) {
-                        // Check all parameters and clear cookies for empty ones
-                        for (const [key, value] of Object.entries(evt.detail.parameters)) {
-                            if (value === '') {
-                                // Delete the cookie for this parameter
-                                document.cookie = key + '=; path=/; max-age=0';
-                            }
-                        }
-                    });
-                });
-                "#))
-            }
+            (cookie_cleaner_script())
             (custom_styles())
         }
     }

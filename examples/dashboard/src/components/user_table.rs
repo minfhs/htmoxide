@@ -15,18 +15,9 @@ pub struct UserTableState {
 pub async fn user_table(
     state: UserTableState, 
     url: UrlBuilder,
-    auth_session: AuthSession,
+    _auth_session: AuthSession,  // Presence of AuthSession auto-protects this component
     app_state: AppStateExt
 ) -> Html {
-    // Require authentication for this component
-    if auth_session.user.is_none() {
-        return Html::new(html! {
-            div.error {
-                p { "Please " a href="/login" { "log in" } " to view the user table." }
-            }
-        });
-    }
-    
     let app_state = &**app_state;
     // Get users from shared state
     let mut users = app_state.users.lock().unwrap().clone();
@@ -103,12 +94,8 @@ pub async fn user_table(
                     // Include current sort as hidden field in the form
                     input type="hidden" name="sort" value=(state.sort);
                     
-                    // Hidden inputs to preserve other components' state (like count, name)
-                    @for (key, value) in all_params {
-                        @if key != "filter" && key != "sort" && !value.is_empty() {
-                            input type="hidden" name=(key) value=(value);
-                        }
-                    }
+                    // Preserve other components' state (like count, name)
+                    (preserve_params(&all_params, &["filter", "sort"]))
                     
                     // Loading indicator
                     span id="search-indicator" class="htmx-indicator" style="margin-left: 0.5rem;" {

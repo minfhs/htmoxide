@@ -115,8 +115,16 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     // Generate extraction code for all extractors
+    let mut auth_session_idx = None;
     let extractor_extractions: Vec<_> = extractors.iter().enumerate().map(|(idx, (_pat, ty))| {
         let extractor_name = syn::Ident::new(&format!("extractor_{}", idx), fn_name.span());
+        let type_name = extract_type_name(ty);
+        
+        // Track which extractor is AuthSession
+        if type_name == "AuthSession" {
+            auth_session_idx = Some(idx);
+        }
+        
         quote! {
             // Extract additional parameter
             let #extractor_name = match #ty::from_request_parts(&mut parts, &()).await {
@@ -132,6 +140,24 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
             };
         }
     }).collect();
+
+    // Generate auth check if component has AuthSession parameter
+    let auth_check = if let Some(idx) = auth_session_idx {
+        let auth_extractor_name = syn::Ident::new(&format!("extractor_{}", idx), fn_name.span());
+        quote! {
+            // Auto-generated auth check: component requires AuthSession
+            if #auth_extractor_name.user.is_none() {
+                // Return a simple unauthorized message for htmx requests
+                return ::htmoxide::Html::new(::maud::html! {
+                    div.error {
+                        p { "Please " a href="/login" { "log in" } " to view this content." }
+                    }
+                }).into_response();
+            }
+        }
+    } else {
+        quote! {}
+    };
 
 
     let output = quote! {
@@ -252,8 +278,8 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                             };
                             
                             if let Some(val) = cookie_value {
-                                if val.is_empty() || val == "__HTMOXIDE_UNSET__" {
-                                    // Remove cookie when value is empty or explicitly unset via sentinel
+                                if val.is_empty() {
+                                    // Remove cookie when value is empty
                                     cookies.remove(::htmoxide::tower_cookies::Cookie::from(key.to_string()));
                                 } else {
                                     let mut cookie = ::htmoxide::tower_cookies::Cookie::new(key.to_string(), val);
@@ -274,6 +300,9 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                 // Extract all additional extractors
                 #(#extractor_extractions)*
+
+                // Auto-generated authentication check (if component has AuthSession parameter)
+                #auth_check
 
                 // Call the component function
                 #call_component
@@ -306,20 +335,4 @@ impl Parse for PrefixArgs {
         let prefix: LitStr = input.parse()?;
         Ok(PrefixArgs { prefix })
     }
-}
-
-/// Macro for generating component URLs with state merging
-///
-/// Usage:
-/// - `component_url!()` - current component, current state
-/// - `component_url!(param = value)` - current component, merge param
-/// - `component_url!(other_fn, param = value)` - different component
-#[proc_macro]
-pub fn component_url(_input: TokenStream) -> TokenStream {
-    // For now, just return a placeholder
-    // This will need runtime support to merge state properly
-    let output = quote! {
-        "#"
-    };
-    output.into()
 }

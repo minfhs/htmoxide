@@ -85,7 +85,9 @@ pub async fn simple_page(
 
 pub async fn users_page(
     auth_session: AuthSession,
-    req: axum::http::Request<axum::body::Body>,
+    cookies: Cookies,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+    Extension(app_state): Extension<Arc<AppState>>,
 ) -> impl IntoResponse {
     // Require authentication for this page
     let user = match &auth_session.user {
@@ -95,15 +97,13 @@ pub async fn users_page(
     
     let username = Some(user.name.as_str());
     
-    // Extract app state from extensions
-    let app_state = req.extensions()
-        .get::<Arc<AppState>>()
-        .expect("AppState not found in extensions")
-        .clone();
+    // Use StateLoader to merge cookies and query params
+    let loader = StateLoader::new(cookies, params.clone());
+    let user_table_state: UserTableState = loader.load();
     
-    let query_string = req.uri().query().unwrap_or("");
-    let user_table_state: UserTableState = serde_urlencoded::from_str(query_string).unwrap_or_default();
-    let user_table_url = UrlBuilder::new("/user_table", query_string).with_main_page("/users");
+    // Build query string from params for URL builders
+    let query_string = serde_urlencoded::to_string(&params).unwrap_or_default();
+    let user_table_url = UrlBuilder::new("/user_table", &query_string).with_main_page("/users");
 
     // Clone auth_session since we need it in two places
     let auth_for_component = auth_session.clone();
@@ -130,7 +130,8 @@ pub async fn users_page(
 pub async fn combined_page(
     auth_session: AuthSession,
     cookies: Cookies,
-    req: axum::http::Request<axum::body::Body>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+    Extension(app_state): Extension<Arc<AppState>>,
 ) -> impl IntoResponse {
     // Require authentication for this page
     let user = match &auth_session.user {
@@ -140,29 +141,19 @@ pub async fn combined_page(
     
     let username = Some(user.name.as_str());
     
-    // Extract app state from extensions
-    let app_state = req.extensions()
-        .get::<Arc<AppState>>()
-        .expect("AppState not found in extensions")
-        .clone();
-    
-    // Parse query string
-    let query_string = req.uri().query().unwrap_or("");
-    let params: std::collections::HashMap<String, String> = 
-        serde_urlencoded::from_str(query_string).unwrap_or_default();
-    
     // Use StateLoader to merge cookies and query params
     let loader = StateLoader::new(cookies, params.clone());
     let counter_state: CounterState = loader.load();
     let greeter_state: GreeterState = loader.load();
     let user_table_state: UserTableState = loader.load();
     
-    let query_string_with_cookies = serde_urlencoded::to_string(&params).unwrap_or_default();
+    // Build query string from params for URL builders
+    let query_string = serde_urlencoded::to_string(&params).unwrap_or_default();
 
     // Create URL builders for components
-    let counter_url = UrlBuilder::new("/counter", &query_string_with_cookies).with_main_page("/combined");
-    let greeter_url = UrlBuilder::new("/greeter", &query_string_with_cookies).with_main_page("/combined");
-    let user_table_url = UrlBuilder::new("/user_table", &query_string_with_cookies).with_main_page("/combined");
+    let counter_url = UrlBuilder::new("/counter", &query_string).with_main_page("/combined");
+    let greeter_url = UrlBuilder::new("/greeter", &query_string).with_main_page("/combined");
+    let user_table_url = UrlBuilder::new("/user_table", &query_string).with_main_page("/combined");
 
     // Clone auth_session for the user_table component
     let auth_for_component = auth_session.clone();

@@ -1,4 +1,5 @@
 use htmoxide::prelude::*;
+use htmoxide::{component, UrlBuilder};
 use crate::state::AppStateExt;
 use crate::auth::AuthSession;
 
@@ -62,7 +63,6 @@ pub async fn user_table(
     let name_sort_url = url.clone().with_params([("sort", "name")]);
     let email_sort_url = url.clone().with_params([("sort", "email")]);
     let role_sort_url = url.clone().with_params([("sort", "role")]);
-    let clear_filter_url = url.clone().with_params([("filter", "")]);
     
     // Get all params to preserve in filter form
     let all_params = url.all_params();
@@ -83,12 +83,23 @@ pub async fn user_table(
             form action=(component_path)
                  hx-get=(component_path)
                  hx-target="#user-table"
-                 hx-swap="outerHTML" {
+                 hx-swap="outerHTML"
+                 hx-indicator="#search-indicator" {
                 fieldset role="group" {
                     input type="text"
+                           id="user-filter-input"
                            name="filter"
                            value=(state.filter)
-                           placeholder="Filter users...";
+                           placeholder="Filter users..."
+                           hx-get=(component_path)
+                           hx-trigger="keyup changed delay:500ms, search"
+                           hx-target="#user-table"
+                           hx-swap="outerHTML"
+                           hx-include="closest form"
+                           hx-sync="closest form:replace"
+                           hx-vals="js:{filter: document.getElementById('user-filter-input').value}" // Need to force filter= param
+                           aria-label="Filter users";
+                    
                     // Include current sort as hidden field in the form
                     input type="hidden" name="sort" value=(state.sort);
                     
@@ -99,56 +110,66 @@ pub async fn user_table(
                         }
                     }
                     
-                    button type="submit" { "Filter" }
-                    @if !state.filter.is_empty() {
-                        button hx-get=(clear_filter_url.build())
-                               hx-target="#user-table"
-                               hx-swap="outerHTML"
-                               type="button"
-                               class="secondary" {
-                            "Clear"
-                        }
+                    // Loading indicator
+                    span id="search-indicator" class="htmx-indicator" style="margin-left: 0.5rem;" {
+                        "⏳"
                     }
                 }
             }
 
-            table {
-                thead {
-                    tr {
-                        th { "ID" }
-                        th {
-                            button hx-get=(name_sort_url.build())
-                                   hx-target="#user-table"
-                                   hx-swap="outerHTML"
-                                   class="sort-button" {
-                                "Name " @if state.sort == "name" { "↓" }
+            @if users.is_empty() && !state.filter.is_empty() {
+                div style="text-align: center; padding: 2rem; color: var(--muted-color);" {
+                    p { "🔍 No users found matching \"" (state.filter) "\"" }
+                    p { 
+                        small { "Try a different search term" }
+                    }
+                }
+            } @else if users.is_empty() {
+                div style="text-align: center; padding: 2rem; color: var(--muted-color);" {
+                    p { "No users available" }
+                }
+            } @else {
+                table {
+                    thead {
+                        tr {
+                            th { "ID" }
+                            th {
+                                button hx-get=(name_sort_url.build())
+                                       hx-target="#user-table"
+                                       hx-swap="outerHTML"
+                                       hx-indicator="#search-indicator"
+                                       class="sort-button" {
+                                    "Name " @if state.sort == "name" { "↓" } @else { "↕" }
+                                }
                             }
-                        }
-                        th {
-                            button hx-get=(email_sort_url.build())
-                                   hx-target="#user-table"
-                                   hx-swap="outerHTML"
-                                   class="sort-button" {
-                                "Email " @if state.sort == "email" { "↓" }
+                            th {
+                                button hx-get=(email_sort_url.build())
+                                       hx-target="#user-table"
+                                       hx-swap="outerHTML"
+                                       hx-indicator="#search-indicator"
+                                       class="sort-button" {
+                                    "Email " @if state.sort == "email" { "↓" } @else { "↕" }
+                                }
                             }
-                        }
-                        th {
-                            button hx-get=(role_sort_url.build())
-                                   hx-target="#user-table"
-                                   hx-swap="outerHTML"
-                                   class="sort-button" {
-                                "Role " @if state.sort == "role" { "↓" }
+                            th {
+                                button hx-get=(role_sort_url.build())
+                                       hx-target="#user-table"
+                                       hx-swap="outerHTML"
+                                       hx-indicator="#search-indicator"
+                                       class="sort-button" {
+                                    "Role " @if state.sort == "role" { "↓" } @else { "↕" }
+                                }
                             }
                         }
                     }
-                }
-                tbody {
-                    @for user in users {
-                        tr {
-                            td { (user.id) }
-                            td { (user.name) }
-                            td { (user.email) }
-                            td { (user.role) }
+                    tbody {
+                        @for user in users {
+                            tr {
+                                td { (user.id) }
+                                td { (user.name) }
+                                td { (user.email) }
+                                td { (user.role) }
+                            }
                         }
                     }
                 }

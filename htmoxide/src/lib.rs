@@ -10,7 +10,7 @@ pub use response::{Html, Page};
 pub use app::{app, RouterExt};
 pub use component::{Component, ComponentInfo};
 pub use state::StateExtractor;
-pub use state_loader::StateLoader;
+pub use state_loader::{StateLoader, UNSET_SENTINEL};
 pub use url_builder::UrlBuilder;
 
 // Re-export inventory for macro use

@@ -252,9 +252,14 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                             };
                             
                             if let Some(val) = cookie_value {
-                                let mut cookie = ::htmoxide::tower_cookies::Cookie::new(key.to_string(), val);
-                                cookie.set_path("/"); // Make cookie available across all paths
-                                cookies.add(cookie);
+                                if val.is_empty() || val == "__HTMOXIDE_UNSET__" {
+                                    // Remove cookie when value is empty or explicitly unset via sentinel
+                                    cookies.remove(::htmoxide::tower_cookies::Cookie::from(key.to_string()));
+                                } else {
+                                    let mut cookie = ::htmoxide::tower_cookies::Cookie::new(key.to_string(), val);
+                                    cookie.set_path("/"); // Make cookie available across all paths
+                                    cookies.add(cookie);
+                                }
                             }
                         }
                     }

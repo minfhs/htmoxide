@@ -26,7 +26,7 @@ pub async fn greeter(state: GreeterState, url: UrlBuilder) -> Html {
                 h3 { (greeting) }
             }
             div {
-                input type="text" id="greeter-input" name="name" value=(state.name) placeholder="Enter your name";
+                input type="text" id="greeter-input" name="name" value=(state.name) placeholder="Enter your name" aria-label="Your name";
                 
                 // Hidden inputs to preserve other components' state
                 @for (key, value) in all_params {
@@ -38,7 +38,8 @@ pub async fn greeter(state: GreeterState, url: UrlBuilder) -> Html {
                 button hx-get=(component_path)
                        hx-include="closest div"
                        hx-target="#greeter"
-                       hx-swap="outerHTML" {
+                       hx-swap="outerHTML swap:200ms"
+                       title="Update greeting" {
                     "Greet"
                 }
             }

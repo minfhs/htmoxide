@@ -83,6 +83,7 @@ pub async fn user_table(
             form hx-get=(filter_url)
                  hx-target="#user-table"
                  hx-swap="outerHTML"
+                 hx-include="#counter, #greeter"
                  hx-trigger="submit" {
                 fieldset role="group" {
                     input type="text"
@@ -96,6 +97,7 @@ pub async fn user_table(
                         button hx-get=(url.clone().with_params([("filter", ""), ("sort", state.sort.as_str())]).build())
                                hx-target="#user-table"
                                hx-swap="outerHTML"
+                               hx-include="#counter, #greeter"
                                type="button"
                                class="secondary" {
                             "Clear"
@@ -112,7 +114,7 @@ pub async fn user_table(
                             button hx-get=(name_sort_url.build())
                                    hx-target="#user-table"
                                    hx-swap="outerHTML"
-                                   hx-include="#user-table-filter-state"
+                                   hx-include="#user-table-filter-state, #counter, #greeter"
                                    class="sort-button" {
                                 "Name " @if state.sort == "name" { "↓" }
                             }
@@ -121,7 +123,7 @@ pub async fn user_table(
                             button hx-get=(email_sort_url.build())
                                    hx-target="#user-table"
                                    hx-swap="outerHTML"
-                                   hx-include="#user-table-filter-state"
+                                   hx-include="#user-table-filter-state, #counter, #greeter"
                                    class="sort-button" {
                                 "Email " @if state.sort == "email" { "↓" }
                             }
@@ -130,7 +132,7 @@ pub async fn user_table(
                             button hx-get=(role_sort_url.build())
                                    hx-target="#user-table"
                                    hx-swap="outerHTML"
-                                   hx-include="#user-table-filter-state"
+                                   hx-include="#user-table-filter-state, #counter, #greeter"
                                    class="sort-button" {
                                 "Role " @if state.sort == "role" { "↓" }
                             }

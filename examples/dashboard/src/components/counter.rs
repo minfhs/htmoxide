@@ -22,18 +22,21 @@ pub async fn counter(state: CounterState, url: UrlBuilder) -> Html {
             }
             button hx-get=(increment_url.build())
                    hx-target="#counter"
-                   hx-swap="outerHTML" {
+                   hx-swap="outerHTML"
+                   hx-include="#greeter, #user-table-filter-state" {
                 "Increment"
             }
             button hx-get=(decrement_url.build())
                    hx-target="#counter"
                    hx-swap="outerHTML"
+                   hx-include="#greeter, #user-table-filter-state"
                    class="secondary" {
                 "Decrement"
             }
             button hx-get=(reset_url.build())
                    hx-target="#counter"
                    hx-swap="outerHTML"
+                   hx-include="#greeter, #user-table-filter-state"
                    class="outline" {
                 "Reset"
             }

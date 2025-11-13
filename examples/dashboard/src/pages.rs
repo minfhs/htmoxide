@@ -29,7 +29,11 @@ pub async fn index(auth_session: AuthSession) -> Page {
                         }
                         li {
                             a href="/users" { "User Table" }
-                            " - Sortable and filterable user table"
+                            " - Sortable and filterable user table (requires login)"
+                        }
+                        li {
+                            a href="/combined" { "Combined View" }
+                            " - Two-column layout with all components (requires login)"
                         }
                     }
                 }
@@ -108,6 +112,63 @@ pub async fn users_page(
                 div.components {
                     // Render the user table component directly with shared state
                     (user_table(user_table_state, user_table_url, auth_for_component, Extension(app_state)).await)
+                }
+            }
+        }
+    }
+    .into();
+    
+    page.into_response()
+}
+
+pub async fn combined_page(
+    auth_session: AuthSession,
+    req: axum::http::Request<axum::body::Body>,
+) -> impl IntoResponse {
+    // Require authentication for this page
+    let user = match &auth_session.user {
+        Some(user) => user,
+        None => return Redirect::to("/login?redirect=/combined").into_response(),
+    };
+    
+    let username = Some(user.name.as_str());
+    
+    // Extract app state from extensions
+    let app_state = req.extensions()
+        .get::<Arc<AppState>>()
+        .expect("AppState not found in extensions")
+        .clone();
+    
+    let query_string = req.uri().query().unwrap_or("");
+    
+    // Extract state for each component
+    let counter_state: CounterState = serde_urlencoded::from_str(query_string).unwrap_or_default();
+    let greeter_state: GreeterState = serde_urlencoded::from_str(query_string).unwrap_or_default();
+    let user_table_state: UserTableState = serde_urlencoded::from_str(query_string).unwrap_or_default();
+
+    // Create URL builders for components
+    let counter_url = UrlBuilder::new("/counter", query_string).with_main_page("/combined");
+    let greeter_url = UrlBuilder::new("/greeter", query_string).with_main_page("/combined");
+    let user_table_url = UrlBuilder::new("/user_table", query_string).with_main_page("/combined");
+
+    // Clone auth_session for the user_table component
+    let auth_for_component = auth_session.clone();
+    
+    let page: Page = html! {
+        (head("Combined View - htmoxide"))
+        body {
+            (header(username))
+            (navbar("combined"))
+
+            main.container {
+                div.grid {
+                    div {
+                        (counter(counter_state, counter_url).await)
+                        (greeter(greeter_state, greeter_url).await)
+                    }
+                    div {
+                        (user_table(user_table_state, user_table_url, auth_for_component, Extension(app_state)).await)
+                    }
                 }
             }
         }

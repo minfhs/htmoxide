@@ -51,6 +51,11 @@ pub fn navbar(current_page: &str) -> Markup {
                         "User Table"
                     }
                 }
+                li { 
+                    a href="/combined" class=(if current_page == "combined" { "contrast" } else { "" }) {
+                        "Combined View"
+                    }
+                }
             }
         }
     }

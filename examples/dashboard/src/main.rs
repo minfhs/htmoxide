@@ -16,7 +16,7 @@ mod auth;
 mod auth_pages;
 
 use state::AppState;
-use pages::{index, simple_page, users_page};
+use pages::{index, simple_page, users_page, combined_page};
 use auth::{Backend, UserStore};
 use auth_pages::{login_page, login_handler, logout_handler};
 
@@ -40,6 +40,7 @@ async fn main() {
         .route("/", get(index))
         .route("/simple", get(simple_page))
         .route("/users", get(users_page))
+        .route("/combined", get(combined_page))
         .layer(Extension(app_state))
         .layer(auth_layer);
 
@@ -52,6 +53,7 @@ async fn main() {
     println!("   - Main page: http://localhost:3000/");
     println!("   - Simple demo: http://localhost:3000/simple");
     println!("   - User table: http://localhost:3000/users");
+    println!("   - Combined view: http://localhost:3000/combined");
     println!("\n   Demo credentials: admin/admin123 or user/user123");
     axum::serve(listener, app).await.unwrap();
 }

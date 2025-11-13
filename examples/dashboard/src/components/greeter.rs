@@ -1,4 +1,6 @@
 use htmoxide::prelude::*;
+use tower_cookies::Cookies;
+use axum::extract::Query;
 
 #[derive(Deserialize, Serialize, Default, Clone, Debug)]
 pub struct GreeterState {
@@ -7,7 +9,12 @@ pub struct GreeterState {
 }
 
 #[component]
-pub async fn greeter(state: GreeterState, url: UrlBuilder) -> Html {
+pub async fn greeter(
+    state: GreeterState,
+    url: UrlBuilder,
+    _cookies: Cookies,
+    _query: Query<std::collections::HashMap<String, String>>,
+) -> Html {
     let greeting = if state.name.is_empty() {
         "Hello, stranger!".to_string()
     } else {

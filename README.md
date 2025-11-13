@@ -22,42 +22,41 @@ htmoxide combines Rust's type safety and performance with htmx's simplicity to c
 
 See the [dashboard example](examples/dashboard) for a complete demo.
 
+For fun, let's look at a hello world HTMX component.
+
 ```rust
 use htmoxide::prelude::*;
 
 #[derive(Deserialize, Serialize, Default)]
-struct CounterState {
-    count: i32,
+struct MyState {
+    something: i32,
 }
 
 #[component]
-async fn counter(state: CounterState, url: UrlBuilder) -> Html {
-    let increment_url = url.clone().with_params([("count", state.count + 1)]);
+async fn my_component(state: CounterState, url: UrlBuilder) -> Html {
+    let mutate = url.clone().with_params([("something", state.something + 1)]);
 
     html! {
-        div id="counter" {
-            h2 { "Count: " (state.count) }
-            button hx-get=(increment_url.build())
-                   hx-target="#counter" {
+        div id="my_component" {
+            h2 { "Something: " (state.something) }
+            button hx-get=(mutate.build())
+                   hx-target="#my_component" {
                 "Increment"
             }
         }
     }.into()
 }
 
-// Protected component - automatically checks auth
-#[component]
-async fn admin_panel(_auth: AuthSession, url: UrlBuilder) -> Html {
-    html! {
-        div { "Admin content - automatically protected!" }
-    }.into()
-}
-
 #[tokio::main]
 async fn main() {
-    let app = app()
-        .page("/", index_page);
+    let app = app() // Automatic registration of all [component]s
+        .page("/", your_page) // register pages
+        .htmx() // enable the htmx layers
+        .layer(Extension(Arc::new(AppState::new()))); // register shared state
 
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 ```

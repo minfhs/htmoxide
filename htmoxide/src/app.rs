@@ -4,6 +4,7 @@ use axum::{
     Extension,
 };
 use tower_http::services::ServeDir;
+use tower_cookies::CookieManagerLayer;
 use std::sync::Arc;
 
 /// Create a new application with auto-registered components
@@ -86,5 +87,96 @@ where
         AppState: Clone + Send + Sync + 'static,
     {
         self.layer(Extension(state))
+    }
+}
+
+/// HTMX-specific router extensions
+pub trait HtmxRouterExt<S>: Sized {
+    /// Adds all required HTMX system layers.
+    ///
+    /// This includes:
+    /// - `CookieManagerLayer` for cookie management (required for empty form value handling)
+    ///
+    /// # Important: Call this AFTER adding all routes
+    ///
+    /// Axum middleware only applies to routes that exist before the layer is added.
+    /// Always add all your routes first, then call `.htmx()`.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let app = app()
+    ///     .route("/login", get(login_page))
+    ///     .route("/dashboard", get(dashboard))
+    ///     .htmx()  // Add HTMX layers AFTER all routes
+    ///     .layer(Extension(app_state));  // Optional app-specific layers
+    /// ```
+    fn htmx(self) -> Self;
+
+    /// Enables automatic cookie-to-query-param redirects on page loads.
+    ///
+    /// When enabled, requests to pages without query parameters will be redirected
+    /// to include cookie values as query parameters. This makes state visible in the URL
+    /// and enables bookmarking/sharing with current state.
+    ///
+    /// By default, sensitive cookies are excluded (token, session, auth, etc.).
+    /// Use `with_cookie_to_query_custom()` to customize the denylist.
+    ///
+    /// # Example
+    /// User visits `/simple` with `count=3` in cookies
+    /// → Redirected to `/simple?count=3`
+    ///
+    /// # Note
+    /// - Only affects non-htmx requests (initial page loads)
+    /// - Skips requests that already have query parameters
+    /// - Must be called AFTER `.htmx()` to ensure cookies are available
+    ///
+    /// ```ignore
+    /// let app = app()
+    ///     .route("/", index_page)
+    ///     .htmx()
+    ///     .with_cookie_to_query();  // Enable with default denylist
+    /// ```
+    fn with_cookie_to_query(self) -> Self;
+
+    /// Enables cookie-to-query redirects with a custom configuration.
+    ///
+    /// # Example with custom denylist
+    /// ```ignore
+    /// use htmoxide::CookieToQueryConfig;
+    ///
+    /// let config = CookieToQueryConfig::new()
+    ///     .deny(["my_secret", "internal_state"]);
+    ///
+    /// let app = app()
+    ///     .route("/", index_page)
+    ///     .htmx()
+    ///     .with_cookie_to_query_custom(config);
+    /// ```
+    fn with_cookie_to_query_custom(self, config: crate::CookieToQueryConfig) -> Self;
+}
+
+impl<S> HtmxRouterExt<S> for Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    fn htmx(self) -> Self {
+        self.layer(CookieManagerLayer::new())
+    }
+
+    fn with_cookie_to_query(self) -> Self {
+        self.with_cookie_to_query_custom(crate::CookieToQueryConfig::default())
+    }
+
+    fn with_cookie_to_query_custom(self, config: crate::CookieToQueryConfig) -> Self {
+        let config = Arc::new(config);
+        self.layer(axum::middleware::from_fn(move |cookies, request, next| {
+            let config = config.clone();
+            crate::cookie_to_query_middleware::cookie_to_query_middleware_impl(
+                config,
+                cookies,
+                request,
+                next,
+            )
+        }))
     }
 }

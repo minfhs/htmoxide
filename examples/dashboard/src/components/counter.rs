@@ -1,4 +1,6 @@
 use htmoxide::prelude::*;
+use tower_cookies::Cookies;
+use axum::extract::Query;
 
 #[derive(Deserialize, Serialize, Default, Clone, Debug)]
 pub struct CounterState {
@@ -7,7 +9,12 @@ pub struct CounterState {
 }
 
 #[component]
-pub async fn counter(state: CounterState, url: UrlBuilder) -> Html {
+pub async fn counter(
+    state: CounterState,
+    url: UrlBuilder,
+    _cookies: Cookies,
+    _query: Query<std::collections::HashMap<String, String>>,
+) -> Html {
     // Build URLs with updated count, preserving all other parameters
     let increment_url = url.clone().with_params([("count", state.count + 1)]);
     let decrement_url = url.clone().with_params([("count", state.count - 1)]);

@@ -6,7 +6,6 @@ use tower_sessions::{Expiry, SessionManagerLayer};
 use tower_sessions::cookie::time::Duration;
 use tower_sessions::MemoryStore;
 use axum_login::AuthManagerLayerBuilder;
-use tower_cookies::CookieManagerLayer;
 
 mod models;
 mod state;
@@ -42,9 +41,10 @@ async fn main() {
         .route("/simple", get(simple_page))
         .route("/users", get(users_page))
         .route("/combined", get(combined_page))
+        .htmx()  // Add HTMX system layers (includes CookieManagerLayer)
+        .with_cookie_to_query()  // Auto-redirect to add cookies as query params on page load
         .layer(Extension(app_state))
-        .layer(auth_layer)
-        .layer(CookieManagerLayer::new());
+        .layer(auth_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await

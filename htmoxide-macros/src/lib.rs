@@ -60,10 +60,13 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let block = &input_fn.block;
     let attrs = &input_fn.attrs;
 
-    // Parse all parameters to detect state, url_builder, and other extractors
+    // Parse all parameters to detect state, url_builder, cookies, query, and other extractors
+    // Track both presence AND position of each parameter type
     let mut state_type = None;
-    let mut has_url_builder = false;
-    let mut extractors = vec![]; // All extractors after state and url_builder
+    let mut url_idx = None;
+    let mut cookies_idx = None;
+    let mut query_idx = None;
+    let mut extractors = vec![]; // All other extractors with their indices
 
     for (idx, param) in sig.inputs.iter().enumerate() {
         if let syn::FnArg::Typed(pat_type) = param {
@@ -73,13 +76,20 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                 // First parameter is component state
                 state_type = Some(&pat_type.ty);
             } else if type_name == "UrlBuilder" {
-                has_url_builder = true;
+                url_idx = Some(idx);
+            } else if type_name == "Cookies" {
+                cookies_idx = Some(idx);
+            } else if type_name.starts_with("Query<") {
+                query_idx = Some(idx);
             } else {
                 // Any other parameter is an extractor (Extension, State, etc.)
-                extractors.push((pat_type, &pat_type.ty));
+                extractors.push((idx, pat_type, &pat_type.ty));
             }
         }
     }
+
+    let has_cookies = cookies_idx.is_some();
+    let has_query = query_idx.is_some();
 
     let state_type = match state_type {
         Some(ty) => ty,
@@ -99,15 +109,30 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
         fn_name.span(),
     );
 
-    // Build component function call with all parameters
-    let mut call_args = vec![quote! { state }];
-    if has_url_builder {
-        call_args.push(quote! { url_builder });
-    }
-    // Add all extractor arguments
-    for (idx, _) in extractors.iter().enumerate() {
-        let extractor_name = syn::Ident::new(&format!("extractor_{}", idx), fn_name.span());
-        call_args.push(quote! { #extractor_name });
+    // Build component function call with all parameters in ORIGINAL order
+    // Create a map of parameter indices to their values
+    let total_params = sig.inputs.len();
+    let mut call_args = Vec::with_capacity(total_params);
+
+    for idx in 0..total_params {
+        let arg = if idx == 0 {
+            // State parameter
+            quote! { state }
+        } else if Some(idx) == url_idx {
+            // URL builder
+            quote! { url_builder }
+        } else if Some(idx) == cookies_idx {
+            // Cookies
+            quote! { cookies }
+        } else if Some(idx) == query_idx {
+            // Query params
+            quote! { query_params }
+        } else {
+            // Must be an extractor
+            let extractor_name = syn::Ident::new(&format!("extractor_{}", idx), fn_name.span());
+            quote! { #extractor_name }
+        };
+        call_args.push(arg);
     }
 
     let call_component = quote! {
@@ -116,13 +141,13 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Generate extraction code for all extractors
     let mut auth_session_idx = None;
-    let extractor_extractions: Vec<_> = extractors.iter().enumerate().map(|(idx, (_pat, ty))| {
-        let extractor_name = syn::Ident::new(&format!("extractor_{}", idx), fn_name.span());
+    let extractor_extractions: Vec<_> = extractors.iter().map(|(param_idx, _pat, ty)| {
+        let extractor_name = syn::Ident::new(&format!("extractor_{}", param_idx), fn_name.span());
         let type_name = extract_type_name(ty);
         
         // Track which extractor is AuthSession
         if type_name == "AuthSession" {
-            auth_session_idx = Some(idx);
+            auth_session_idx = Some(*param_idx);
         }
         
         quote! {
@@ -160,12 +185,67 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
 
-    let output = quote! {
-        // Original function
-        #(#attrs)*
-        #vis #sig {
-            #block
+    // Generate state loading wrapper if component accepts Cookies and/or Query
+    let wrapped_function = if has_cookies && has_query {
+        // Component wants automatic state loading from cookies and query params
+        let inner_fn_name = syn::Ident::new(&format!("{}_inner", fn_name), fn_name.span());
+        let return_type = &sig.output;
+        let asyncness = &sig.asyncness;
+        let inputs = &sig.inputs;
+
+        // Build a list of (index, pattern) for all parameters
+        let mut indexed_params = vec![];
+        for (idx, param) in sig.inputs.iter().enumerate() {
+            if let syn::FnArg::Typed(pat_type) = param {
+                indexed_params.push((idx, &pat_type.pat));
+            }
         }
+
+        // Get parameter patterns by their tracked indices
+        let cookies_param = &indexed_params[cookies_idx.unwrap()].1;
+        let query_param = &indexed_params[query_idx.unwrap()].1;
+
+        // Build the call to inner function with parameters in their ORIGINAL order
+        let inner_call_args: Vec<_> = indexed_params.iter().map(|(idx, pat)| {
+            if *idx == 0 {
+                // State parameter - use loaded_state
+                quote! { loaded_state }
+            } else {
+                // All other parameters - pass through as-is
+                quote! { #pat }
+            }
+        }).collect();
+
+        quote! {
+            // Inner implementation (original function logic)
+            #(#attrs)*
+            #asyncness fn #inner_fn_name(#inputs) #return_type {
+                #block
+            }
+
+            // Wrapper that auto-loads state from cookies and query params
+            #(#attrs)*
+            #vis #asyncness fn #fn_name(#inputs) #return_type {
+                // Auto-load state using StateLoader pattern
+                let loader = ::htmoxide::StateLoader::new(#cookies_param.clone(), #query_param.0.clone());
+                let loaded_state: #state_type = loader.load();
+
+                #inner_fn_name(#(#inner_call_args),*).await
+            }
+        }
+    } else {
+        // No automatic state loading needed
+        quote! {
+            #(#attrs)*
+            #vis #sig {
+                #block
+            }
+        }
+    };
+
+    let output = quote! {
+        // Component function (with optional state loading wrapper)
+        #wrapped_function
 
         // Generate axum handler wrapper
         #[doc(hidden)]
@@ -201,6 +281,10 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                             .into_response();
                     }
                 };
+
+                // Extract query parameters as HashMap for component access
+                let query_params = ::axum::extract::Query::<std::collections::HashMap<String, String>>::from_request_parts(&mut parts, &()).await
+                    .unwrap_or_else(|_| ::axum::extract::Query(std::collections::HashMap::new()));
 
                 // Extract state from query parameters first (URL params take priority)
                 let mut state = match ::htmoxide::StateExtractor::<#state_type>::from_request_parts(

@@ -1,27 +1,31 @@
-use htmoxide::prelude::*;
-use htmoxide::{component, UrlBuilder};
-use crate::state::AppStateExt;
 use crate::auth::AuthSession;
+use crate::state::AppStateExt;
+use axum::extract::Query;
+use htmoxide::prelude::*;
+use htmoxide::{UrlBuilder, component};
+use tower_cookies::Cookies;
 
 #[derive(Deserialize, Serialize, Default, Clone, Debug)]
 pub struct UserTableState {
     #[serde(default)]
-    pub sort: String,  // "name", "email", "role", or ""
+    pub sort: String, // "name", "email", "role", or ""
     #[serde(default)]
-    pub filter: String,  // filter text
+    pub filter: String, // filter text
 }
 
 #[component]
 pub async fn user_table(
-    state: UserTableState, 
+    state: UserTableState,
     url: UrlBuilder,
-    _auth_session: AuthSession,  // Presence of AuthSession auto-protects this component
-    app_state: AppStateExt
+    app_state: AppStateExt,
+    _cookies: Cookies,
+    _query: Query<std::collections::HashMap<String, String>>,
+    _auth_session: AuthSession, // Presence of AuthSession auto-protects this component
 ) -> Html {
     let app_state = &**app_state;
     // Get users from shared state
     let mut users = app_state.users.lock().unwrap().clone();
-    
+
     // Increment request counter
     {
         let mut count = app_state.request_count.lock().unwrap();
@@ -32,9 +36,9 @@ pub async fn user_table(
     if !state.filter.is_empty() {
         let filter_lower = state.filter.to_lowercase();
         users.retain(|u| {
-            u.name.to_lowercase().contains(&filter_lower) ||
-            u.email.to_lowercase().contains(&filter_lower) ||
-            u.role.to_lowercase().contains(&filter_lower)
+            u.name.to_lowercase().contains(&filter_lower)
+                || u.email.to_lowercase().contains(&filter_lower)
+                || u.role.to_lowercase().contains(&filter_lower)
         });
     }
 
@@ -48,25 +52,24 @@ pub async fn user_table(
 
     // Use base component URL - parameters will come from form inputs
     let component_path = "/user_table";
-    
-    
+
     // Build URLs for sort buttons, preserving filter
     let name_sort_url = url.clone().with_params([("sort", "name")]);
     let email_sort_url = url.clone().with_params([("sort", "email")]);
     let role_sort_url = url.clone().with_params([("sort", "role")]);
-    
+
     // Get all params to preserve in filter form
     let all_params = url.all_params();
-    
+
     let request_count = app_state.request_count.lock().unwrap();
 
     let markup = html! {
         article id="user-table" {
             header {
                 h2 { "User Table" }
-                p { 
-                    small { 
-                        "Request count: " (request_count) " | Users in database: " (app_state.users.lock().unwrap().len()) 
+                p {
+                    small {
+                        "Request count: " (request_count) " | Users in database: " (app_state.users.lock().unwrap().len())
                     }
                 }
             }
@@ -90,13 +93,13 @@ pub async fn user_table(
                            hx-sync="closest form:replace"
                            hx-vals="js:{filter: document.getElementById('user-filter-input').value}" // Need to force filter= param
                            aria-label="Filter users";
-                    
+
                     // Include current sort as hidden field in the form
                     input type="hidden" name="sort" value=(state.sort);
-                    
+
                     // Preserve other components' state (like count, name)
                     (preserve_params(&all_params, &["filter", "sort"]))
-                    
+
                     // Loading indicator
                     span id="search-indicator" class="htmx-indicator" style="margin-left: 0.5rem;" {
                         "⏳"
@@ -107,7 +110,7 @@ pub async fn user_table(
             @if users.is_empty() && !state.filter.is_empty() {
                 div style="text-align: center; padding: 2rem; color: var(--muted-color);" {
                     p { "🔍 No users found matching \"" (state.filter) "\"" }
-                    p { 
+                    p {
                         small { "Try a different search term" }
                     }
                 }

@@ -1,0 +1,23 @@
+[package]
+name = "htmoxide"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+axum.workspace = true
+tokio.workspace = true
+maud.workspace = true
+serde.workspace = true
+serde_urlencoded.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+
+htmoxide-macros = { path = "../htmoxide-macros" }
+
+# For global component registry
+inventory = "0.3"
+once_cell = "1.19"
+
+[dev-dependencies]

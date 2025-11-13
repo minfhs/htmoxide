@@ -1,0 +1,18 @@
+[workspace]
+members = ["htmoxide", "htmoxide-macros", "examples/dashboard"]
+resolver = "2"
+
+[workspace.dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+maud = "0.26"
+serde = { version = "1.0", features = ["derive"] }
+serde_urlencoded = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["fs"] }
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["htmoxide contributors"]
+license = "MIT OR Apache-2.0"

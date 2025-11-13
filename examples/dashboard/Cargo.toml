@@ -1,0 +1,17 @@
+[package]
+name = "dashboard"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "dashboard"
+path = "src/main.rs"
+
+[dependencies]
+htmoxide = { path = "../../htmoxide" }
+axum.workspace = true
+tokio.workspace = true
+maud.workspace = true
+serde.workspace = true

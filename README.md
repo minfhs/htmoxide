@@ -9,8 +9,11 @@ htmoxide combines Rust's type safety and performance with htmx's simplicity to c
 ## Features
 
 - **Component Macro** - Auto-register routes and handle state extraction
+- **Declarative Auth Protection** - Components with `AuthSession` parameter automatically protected
 - **URL State Management** - Component state serialized in URLs (bookmarkable/shareable)
+- **Cookie Persistence** - Automatic fallback from URL params to cookies with helper functions
 - **UrlBuilder** - Automatic state merging across component interactions
+- **Client Helpers** - Reusable functions for cookie management, param preservation, and input clearing
 - **Shared Application State** - Via Axum's Extension/Arc pattern
 - **Type-safe** - Leverages Rust's type system and Serde for state
 - **Server-side Rendering** - Components render on server, htmx handles DOM updates
@@ -39,6 +42,14 @@ async fn counter(state: CounterState, url: UrlBuilder) -> Html {
                 "Increment"
             }
         }
+    }.into()
+}
+
+// Protected component - automatically checks auth
+#[component]
+async fn admin_panel(_auth: AuthSession, url: UrlBuilder) -> Html {
+    html! {
+        div { "Admin content - automatically protected!" }
     }.into()
 }
 

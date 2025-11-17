@@ -8,6 +8,9 @@ pub mod client_helpers;
 pub mod state_urls_middleware;
 pub mod body;
 
+#[cfg(feature = "qs-forms")]
+pub mod qs_form;
+
 pub use htmoxide_macros::component;
 pub use response::{Html, Page};
 pub use app::{app, RouterExt, HtmxRouterExt};
@@ -18,6 +21,9 @@ pub use url_builder::{UrlBuilder, ComponentName};
 pub use client_helpers::{cookie_cleaner_script, preserve_params, clear_input_handler};
 pub use state_urls_middleware::{StateUrlsConfig, state_urls_middleware_impl};
 pub use body::Body;
+
+#[cfg(feature = "qs-forms")]
+pub use qs_form::QsForm;
 
 // Re-export inventory for macro use
 #[doc(hidden)]
@@ -40,6 +46,9 @@ pub mod prelude {
     pub use crate::client_helpers::{cookie_cleaner_script, preserve_params, clear_input_handler};
     pub use crate::state_urls_middleware::StateUrlsConfig;
     pub use crate::body::Body;
+
+    #[cfg(feature = "qs-forms")]
+    pub use crate::qs_form::QsForm;
 
     // Re-export commonly used items from dependencies
     pub use maud::{html, Markup};

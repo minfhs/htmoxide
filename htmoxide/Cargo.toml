@@ -8,6 +8,7 @@ license.workspace = true
 [features]
 default = []
 persist-state = []  # Auto-hydrate view state from cookies + enable with_state_urls
+qs-forms = ["dep:serde_qs", "dep:urlencoding"]  # Form parsing with array field support (field[])
 
 [dependencies]
 axum.workspace = true
@@ -19,6 +20,8 @@ serde_json = "1"
 tower.workspace = true
 tower-http.workspace = true
 tower-cookies = "0.11"
+serde_qs = { version = "0.13", optional = true }
+urlencoding = { version = "2.1", optional = true }
 
 htmoxide-macros = { path = "../htmoxide-macros" }
 

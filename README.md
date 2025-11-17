@@ -44,6 +44,29 @@ struct TodoState {
 }
 ```
 
+### 4. Advanced Form Handling (Optional)
+With the `qs-forms` feature, handle complex forms with array fields:
+
+```rust
+#[derive(Deserialize, Serialize, Default)]
+struct CreatePost {
+    title: String,
+    tags: Vec<String>,  // Parses from tags[]=foo&tags[]=bar
+}
+
+#[component(method = "POST")]
+async fn create_post(
+    state: AppState,
+    url: UrlBuilder,
+    Body(QsForm(form)): Body<QsForm<CreatePost>>,
+) -> Html {
+    // form.tags contains ["foo", "bar"]
+    /* ... */
+}
+```
+
+Enable with: `htmoxide = { version = "0.1", features = ["qs-forms"] }`
+
 ## Everything Else is Axum
 
 - Use any Axum extractor (`Extension`, `State`, `Path`, `Form`, `Json`, etc.)

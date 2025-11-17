@@ -36,14 +36,14 @@ impl StateLoader {
         let mut state = T::default();
         
         // Try to serialize to JSON to access individual fields
-        if let Ok(mut state_json) = serde_json::to_value(&state) {
-            if let Some(state_obj) = state_json.as_object_mut() {
-                if let Ok(default_json) = serde_json::to_value(&T::default()) {
-                    if let Some(default_obj) = default_json.as_object() {
+        if let Ok(mut state_json) = serde_json::to_value(&state)
+            && let Some(state_obj) = state_json.as_object_mut() {
+                if let Ok(default_json) = serde_json::to_value(T::default())
+                    && let Some(default_obj) = default_json.as_object() {
                         // For each field, check cookies first, then query params
                         for (key, default_value) in default_obj {
                             let mut current_value = default_value.clone();
-                            
+
                             // First, try to load from cookie
                             if let Some(cookie) = self.cookies.get(key) {
                                 let cookie_value = cookie.value();
@@ -51,25 +51,22 @@ impl StateLoader {
                                     current_value = parsed;
                                 }
                             }
-                            
+
                             // Then, override with query param if present
-                            if let Some(query_value) = self.query_params.get(key) {
-                                if let Some(parsed) = Self::parse_value(query_value) {
+                            if let Some(query_value) = self.query_params.get(key)
+                                && let Some(parsed) = Self::parse_value(query_value) {
                                     current_value = parsed;
                                 }
-                            }
-                            
+
                             state_obj.insert(key.clone(), current_value);
                         }
                     }
-                }
-                
+
                 // Deserialize back to state
                 if let Ok(new_state) = serde_json::from_value(state_json) {
                     state = new_state;
                 }
             }
-        }
         
         state
     }

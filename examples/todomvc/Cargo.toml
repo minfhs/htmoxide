@@ -3,6 +3,12 @@ name = "todomvc"
 version.workspace = true
 edition.workspace = true
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("persist-state"))'] }
+
+[features]
+persist-state = ["htmoxide/persist-state"]
+
 [dependencies]
 htmoxide = { path = "../../htmoxide" }
 axum.workspace = true

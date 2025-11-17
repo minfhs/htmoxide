@@ -44,11 +44,10 @@ impl IntoResponse for Html {
             .into_response();
 
         // Add HX-Push-Url header if specified
-        if let Some(push_url) = self.push_url {
-            if let Ok(header_value) = HeaderValue::from_str(&push_url) {
+        if let Some(push_url) = self.push_url
+            && let Ok(header_value) = HeaderValue::from_str(&push_url) {
                 response.headers_mut().insert("HX-Push-Url", header_value);
             }
-        }
 
         response
     }

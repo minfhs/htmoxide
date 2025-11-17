@@ -1,5 +1,5 @@
 use crate::TodoDb;
-use crate::todos::{Todo, TodoList as TodoListData};
+use crate::todos::Todo;
 use axum::Extension;
 use axum::extract::{Form, Path};
 use htmoxide::prelude::*;
@@ -241,7 +241,7 @@ pub async fn delete_todo(
 // Start editing a todo
 #[component(prefix = "/todos", path = "/{id}/edit")]
 pub async fn edit_todo(
-    state: TodoViewState,
+    _state: TodoViewState,
     url: UrlBuilder,
     Extension(db): Extension<TodoDb>,
     Path(id): Path<usize>,
@@ -264,7 +264,7 @@ pub async fn edit_todo(
 // Update a todo's title
 #[component(prefix = "/todos", path = "/{id}/update", method = "POST")]
 pub async fn update_todo(
-    state: TodoViewState,
+    _state: TodoViewState,
     url: UrlBuilder,
     Extension(db): Extension<TodoDb>,
     Path(id): Path<usize>,

@@ -1,6 +1,5 @@
 use axum::routing::get;
 use htmoxide::prelude::*;
-use htmoxide::RouterExt;
 use std::sync::{Arc, Mutex};
 
 mod components;

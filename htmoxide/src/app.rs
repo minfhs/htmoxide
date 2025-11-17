@@ -42,6 +42,7 @@ pub fn app() -> Router {
         let handler = component.handler;
 
         // Route based on HTTP method
+        #[allow(clippy::redundant_closure)]
         let method_service = match component.method {
             "POST" => post(move |req| handler(req)),
             "PUT" => put(move |req| handler(req)),

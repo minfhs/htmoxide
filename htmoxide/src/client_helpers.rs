@@ -95,9 +95,6 @@ pub fn preserve_params(params: &HashMap<String, String>, exclude: &[&str]) -> Ma
 /// ```
 pub fn clear_input_handler(input_id: &str, event: &str) -> String {
     format!(
-        "document.getElementById('{}').value = ''; htmx.trigger('{}', '{}');",
-        input_id,
-        format!("#{}", input_id),
-        event
+        "document.getElementById('{input_id}').value = ''; htmx.trigger('#{input_id}', '{event}');"
     )
 }

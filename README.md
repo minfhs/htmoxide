@@ -1,46 +1,73 @@
 # HTMoXide
 
-A Rust framework for building interactive web applications with htmx.
+Build interactive web apps with htmx and Axum - zero JavaScript required.
 
 ## Overview
 
-htmoxide combines Rust's type safety and performance with htmx's simplicity to create dynamic web applications without writing JavaScript. Components manage their state through URL query parameters, enabling bookmarkable, shareable application states.
+htmoxide is a thin layer over Axum that adds component-based routing and automatic state management. You get all of Axum's extractors and middleware, plus conventions that make htmx development ergonomic.
 
-## Features
+## What htmoxide Adds to Axum
 
-- **Component Macro** - Auto-register routes and handle state extraction
-- **Declarative Auth Protection** - Components with `AuthSession` parameter automatically protected
-- **URL State Management** - Component state serialized in URLs (bookmarkable/shareable)
-- **Cookie Persistence** - Automatic fallback from URL params to cookies with helper functions
-- **UrlBuilder** - Automatic state merging across component interactions
-- **Client Helpers** - Reusable functions for cookie management, param preservation, and input clearing
-- **Shared Application State** - Via Axum's Extension/Arc pattern
-- **Type-safe** - Leverages Rust's type system and Serde for state
-- **Server-side Rendering** - Components render on server, htmx handles DOM updates
+### 1. Component Macro - Auto-Route Registration
+Define handlers as components with automatic route registration:
+
+```rust
+#[component(prefix = "/todos", path = "/{id}/toggle", method = "POST")]
+pub async fn toggle_todo(
+    state: TodoState,           // Auto-hydrated from query params
+    url: UrlBuilder,            // Type-safe URL builder
+    Extension(db): Extension<TodoDb>,  // Standard Axum extractors work
+    Path(id): Path<usize>,
+) -> Html { /* ... */ }
+```
+
+No manual `.route()` calls - components register themselves at compile time.
+
+### 2. Type-Safe Component URLs
+Components generate marker types for compile-time URL building:
+
+```rust
+// `toggle_todo` generates `ToggleTodo` type
+url.for_component(ToggleTodo)
+   .with_path_param("id", 5)
+   .with_params([("filter", "active")])
+   .build()  // "/todos/5/toggle?filter=active"
+```
+
+### 3. Automatic State Hydration
+Component state deserializes from query params (and optionally cookies):
+
+```rust
+#[derive(Deserialize, Serialize, Default)]
+struct TodoState {
+    filter: String,  // Automatically populated from ?filter=active
+}
+```
+
+## Everything Else is Axum
+
+- Use any Axum extractor (`Extension`, `State`, `Path`, `Form`, `Json`, etc.)
+- All Axum middleware works unchanged
+- Standard `tower` and `tower-http` layers
+- Same async runtime (tokio)
 
 ## Quick Start
-
-See the [TodoMVC example](examples/todomvc) for a complete demo.
-
-For fun, let's look at a hello world HTMX component.
 
 ```rust
 use htmoxide::prelude::*;
 
 #[derive(Deserialize, Serialize, Default)]
-struct MyState {
-    something: i32,
+struct CounterState {
+    count: i32,
 }
 
 #[component]
-async fn my_component(state: CounterState, url: UrlBuilder) -> Html {
-    let mutate = url.clone().with_params([("something", state.something + 1)]);
-
+async fn counter(state: CounterState, url: UrlBuilder) -> Html {
     html! {
-        div id="my_component" {
-            h2 { "Something: " (state.something) }
-            button hx-get=(mutate.build())
-                   hx-target="#my_component" {
+        div {
+            p { "Count: " (state.count) }
+            button hx-get=(url.with_params([("count", state.count + 1)]).build())
+                   hx-target="closest div" {
                 "Increment"
             }
         }
@@ -49,17 +76,18 @@ async fn my_component(state: CounterState, url: UrlBuilder) -> Html {
 
 #[tokio::main]
 async fn main() {
-    let app = app() // Automatic registration of all [component]s
-        .page("/", your_page) // register pages
-        .htmx() // enable the htmx layers
-        .layer(Extension(Arc::new(AppState::new()))); // register shared state
+    let app = htmoxide::app()  // Components auto-register
+        .route("/", get(index_page))
+        .htmx();  // Add htmx middleware
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-        .await
-        .unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(
+        tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap(),
+        app
+    ).await.unwrap();
 }
 ```
+
+See the [TodoMVC example](examples/todomvc) for a complete application.
 
 ## Project Structure
 

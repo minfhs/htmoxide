@@ -7,15 +7,15 @@ use tower_cookies::Cookies;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-/// Configuration for cookie-to-query middleware
+/// Configuration for state URLs middleware
 #[derive(Clone, Debug)]
-pub struct CookieToQueryConfig {
+pub struct StateUrlsConfig {
     /// Cookie names to exclude from being added to query params
     /// Common examples: "token", "session_id", "csrf_token", "auth"
     pub denylist: Arc<HashSet<String>>,
 }
 
-impl CookieToQueryConfig {
+impl StateUrlsConfig {
     /// Create a new config with an empty denylist
     pub fn new() -> Self {
         Self {
@@ -49,7 +49,7 @@ impl CookieToQueryConfig {
     }
 }
 
-impl Default for CookieToQueryConfig {
+impl Default for StateUrlsConfig {
     fn default() -> Self {
         // Sensible defaults for common sensitive cookies
         Self::with_denylist([
@@ -82,8 +82,8 @@ impl Default for CookieToQueryConfig {
 ///
 /// # Security
 /// Sensitive cookies (tokens, session IDs, etc.) are excluded via the denylist
-pub async fn cookie_to_query_middleware_impl(
-    config: Arc<CookieToQueryConfig>,
+pub async fn state_urls_middleware_impl(
+    config: Arc<StateUrlsConfig>,
     cookies: Cookies,
     request: Request,
     next: Next,

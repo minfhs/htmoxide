@@ -5,6 +5,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = []
+persist-state = []  # Auto-hydrate view state from cookies + enable with_state_urls
+
 [dependencies]
 axum.workspace = true
 tokio.workspace = true

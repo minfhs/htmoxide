@@ -20,7 +20,7 @@ htmoxide combines Rust's type safety and performance with htmx's simplicity to c
 
 ## Quick Start
 
-See the [dashboard example](examples/dashboard) for a complete demo.
+See the [TodoMVC example](examples/todomvc) for a complete demo.
 
 For fun, let's look at a hello world HTMX component.
 
@@ -65,7 +65,7 @@ async fn main() {
 
 - `htmoxide/` - Core framework
 - `htmoxide-macros/` - Procedural macros
-- `examples/dashboard/` - Comprehensive example
+- `examples/todomvc/` - TodoMVC implementation example
 
 ## Built upon
 

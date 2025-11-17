@@ -1,12 +1,27 @@
 use std::collections::HashMap;
 use serde::de::DeserializeOwned;
 
+/// Trait for getting a component's name at compile time
+pub trait ComponentName {
+    fn name() -> &'static str;
+}
+
 /// Helper for building component URLs with merged query parameters
 #[derive(Clone)]
 pub struct UrlBuilder {
     path: String,
     all_params: HashMap<String, String>,
     main_page_path: Option<String>,
+}
+
+/// Get the route path for a component by name
+pub fn component_route(component_name: &str) -> Option<&'static str> {
+    for component in inventory::iter::<crate::ComponentInfo> {
+        if component.name == component_name {
+            return Some(component.path);
+        }
+    }
+    None
 }
 
 impl UrlBuilder {
@@ -34,6 +49,52 @@ impl UrlBuilder {
         for (key, value) in params {
             self.all_params.insert(key.into(), value.to_string());
         }
+        self
+    }
+
+    /// Create a new UrlBuilder for a different component using the function name
+    ///
+    /// # Example
+    /// ```ignore
+    /// url.for_component(create_todo).build()
+    /// // If the current URL is /todos/1?filter=active
+    /// // This returns /todos/create?filter=active
+    /// ```
+    pub fn for_component<F>(mut self, _component: F) -> Self
+    where
+        F: ComponentName,
+    {
+        let component_name = F::name();
+        if let Some(route) = component_route(component_name) {
+            self.path = route.to_string();
+        }
+        self
+    }
+
+    /// Create a new UrlBuilder for a different component, preserving state params
+    /// (String-based version for dynamic use cases)
+    ///
+    /// # Example
+    /// ```ignore
+    /// url.with_component("create_todo").build()
+    /// ```
+    pub fn with_component(mut self, component_name: &str) -> Self {
+        if let Some(route) = component_route(component_name) {
+            self.path = route.to_string();
+        }
+        self
+    }
+
+    /// Replace path parameters in the route template
+    ///
+    /// # Example
+    /// ```ignore
+    /// url.with_component("toggle_todo").with_path_param("id", 42).build()
+    /// // Returns /todos/42/toggle?filter=active
+    /// ```
+    pub fn with_path_param(mut self, param_name: &str, value: impl ToString) -> Self {
+        let placeholder = format!("{{{}}}", param_name);
+        self.path = self.path.replace(&placeholder, &value.to_string());
         self
     }
 

@@ -5,7 +5,8 @@ pub mod state;
 pub mod state_loader;
 pub mod url_builder;
 pub mod client_helpers;
-pub mod cookie_to_query_middleware;
+pub mod state_urls_middleware;
+pub mod body;
 
 pub use htmoxide_macros::component;
 pub use response::{Html, Page};
@@ -13,9 +14,10 @@ pub use app::{app, RouterExt, HtmxRouterExt};
 pub use component::{Component, ComponentInfo};
 pub use state::StateExtractor;
 pub use state_loader::StateLoader;
-pub use url_builder::UrlBuilder;
+pub use url_builder::{UrlBuilder, ComponentName};
 pub use client_helpers::{cookie_cleaner_script, preserve_params, clear_input_handler};
-pub use cookie_to_query_middleware::{CookieToQueryConfig, cookie_to_query_middleware_impl};
+pub use state_urls_middleware::{StateUrlsConfig, state_urls_middleware_impl};
+pub use body::Body;
 
 // Re-export inventory for macro use
 #[doc(hidden)]
@@ -36,7 +38,8 @@ pub mod prelude {
     pub use crate::url_builder::UrlBuilder;
     pub use crate::state_loader::StateLoader;
     pub use crate::client_helpers::{cookie_cleaner_script, preserve_params, clear_input_handler};
-    pub use crate::cookie_to_query_middleware::CookieToQueryConfig;
+    pub use crate::state_urls_middleware::StateUrlsConfig;
+    pub use crate::body::Body;
 
     // Re-export commonly used items from dependencies
     pub use maud::{html, Markup};

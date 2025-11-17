@@ -1,0 +1,11 @@
+[package]
+name = "todomvc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+htmoxide = { path = "../../htmoxide" }
+axum.workspace = true
+tokio.workspace = true
+maud.workspace = true
+serde.workspace = true

@@ -1,5 +1,5 @@
 [workspace]
-members = ["htmoxide", "htmoxide-macros", "examples/dashboard"]
+members = ["htmoxide", "htmoxide-macros", "examples/todomvc"]
 resolver = "2"
 
 [workspace.dependencies]

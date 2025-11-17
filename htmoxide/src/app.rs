@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    routing::get,
+    routing::{get, post, put, delete, patch},
     Extension,
 };
 use tower_http::services::ServeDir;
@@ -28,7 +28,7 @@ use std::sync::Arc;
 ///     .page("/", index);
 /// ```
 ///
-/// # Example without state  
+/// # Example without state
 /// ```ignore
 /// let app = app()
 ///     .page("/", index);
@@ -38,12 +38,19 @@ pub fn app() -> Router {
 
     // Register all components from the global registry
     for component in inventory::iter::<crate::ComponentInfo> {
-        println!("Registering component: {} at {}", component.name, component.path);
+        println!("Registering component: {} at {} ({})", component.name, component.path, component.method);
         let handler = component.handler;
-        router = router.route(
-            component.path,
-            get(move |req| handler(req))
-        );
+
+        // Route based on HTTP method
+        let method_service = match component.method {
+            "POST" => post(move |req| handler(req)),
+            "PUT" => put(move |req| handler(req)),
+            "DELETE" => delete(move |req| handler(req)),
+            "PATCH" => patch(move |req| handler(req)),
+            _ => get(move |req| handler(req)), // Default to GET
+        };
+
+        router = router.route(component.path, method_service);
     }
 
     router
@@ -112,14 +119,14 @@ pub trait HtmxRouterExt<S>: Sized {
     /// ```
     fn htmx(self) -> Self;
 
-    /// Enables automatic cookie-to-query-param redirects on page loads.
+    /// Enables automatic state URLs - redirects page loads to include cookie values in URL.
     ///
     /// When enabled, requests to pages without query parameters will be redirected
     /// to include cookie values as query parameters. This makes state visible in the URL
     /// and enables bookmarking/sharing with current state.
     ///
     /// By default, sensitive cookies are excluded (token, session, auth, etc.).
-    /// Use `with_cookie_to_query_custom()` to customize the denylist.
+    /// Use `with_state_urls_custom()` to customize the denylist.
     ///
     /// # Example
     /// User visits `/simple` with `count=3` in cookies
@@ -134,25 +141,25 @@ pub trait HtmxRouterExt<S>: Sized {
     /// let app = app()
     ///     .route("/", index_page)
     ///     .htmx()
-    ///     .with_cookie_to_query();  // Enable with default denylist
+    ///     .with_state_urls();  // Enable with default denylist
     /// ```
-    fn with_cookie_to_query(self) -> Self;
+    fn with_state_urls(self) -> Self;
 
-    /// Enables cookie-to-query redirects with a custom configuration.
+    /// Enables state URLs with a custom configuration.
     ///
     /// # Example with custom denylist
     /// ```ignore
-    /// use htmoxide::CookieToQueryConfig;
+    /// use htmoxide::StateUrlsConfig;
     ///
-    /// let config = CookieToQueryConfig::new()
+    /// let config = StateUrlsConfig::new()
     ///     .deny(["my_secret", "internal_state"]);
     ///
     /// let app = app()
     ///     .route("/", index_page)
     ///     .htmx()
-    ///     .with_cookie_to_query_custom(config);
+    ///     .with_state_urls_custom(config);
     /// ```
-    fn with_cookie_to_query_custom(self, config: crate::CookieToQueryConfig) -> Self;
+    fn with_state_urls_custom(self, config: crate::StateUrlsConfig) -> Self;
 }
 
 impl<S> HtmxRouterExt<S> for Router<S>
@@ -163,15 +170,15 @@ where
         self.layer(CookieManagerLayer::new())
     }
 
-    fn with_cookie_to_query(self) -> Self {
-        self.with_cookie_to_query_custom(crate::CookieToQueryConfig::default())
+    fn with_state_urls(self) -> Self {
+        self.with_state_urls_custom(crate::StateUrlsConfig::default())
     }
 
-    fn with_cookie_to_query_custom(self, config: crate::CookieToQueryConfig) -> Self {
+    fn with_state_urls_custom(self, config: crate::StateUrlsConfig) -> Self {
         let config = Arc::new(config);
         self.layer(axum::middleware::from_fn(move |cookies, request, next| {
             let config = config.clone();
-            crate::cookie_to_query_middleware::cookie_to_query_middleware_impl(
+            crate::state_urls_middleware::state_urls_middleware_impl(
                 config,
                 cookies,
                 request,

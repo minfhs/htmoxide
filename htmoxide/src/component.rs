@@ -15,11 +15,12 @@ pub struct ComponentInfo {
     pub name: &'static str,
     pub path: &'static str,
     pub handler: ComponentHandler,
+    pub method: &'static str,
 }
 
 impl ComponentInfo {
-    pub const fn new(name: &'static str, path: &'static str, handler: ComponentHandler) -> Self {
-        Self { name, path, handler }
+    pub const fn new(name: &'static str, path: &'static str, handler: ComponentHandler, method: &'static str) -> Self {
+        Self { name, path, handler, method }
     }
 }
 

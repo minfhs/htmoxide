@@ -1,11 +1,11 @@
 use axum::{
     extract::Request,
     middleware::Next,
-    response::{IntoResponse, Response, Redirect},
+    response::{IntoResponse, Redirect, Response},
 };
-use tower_cookies::Cookies;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use tower_cookies::Cookies;
 
 /// Configuration for state URLs middleware
 #[derive(Clone, Debug)]
@@ -121,8 +121,7 @@ pub async fn state_urls_middleware_impl(
 
     // If we have cookies, redirect to the same path with query params
     if !query_params.is_empty() {
-        let query_string = serde_urlencoded::to_string(&query_params)
-            .unwrap_or_default();
+        let query_string = serde_urlencoded::to_string(&query_params).unwrap_or_default();
         let redirect_url = format!("{}?{}", path, query_string);
         return Redirect::to(&redirect_url).into_response();
     }

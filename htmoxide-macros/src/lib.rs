@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn, LitStr, parse::Parse, parse::ParseStream, Token};
+use syn::{ItemFn, LitStr, Token, parse::Parse, parse::ParseStream, parse_macro_input};
 
 /// Helper to extract the type name from a Type for pattern matching
 fn extract_type_name(ty: &syn::Type) -> String {
@@ -50,7 +50,10 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
             // Explicit path: #[component("/users")]
             let lit: LitStr = parse_macro_input!(attr as LitStr);
             (lit.value(), "GET".to_string())
-        } else if attr_str.contains("prefix") || attr_str.contains("method") || attr_str.contains("path") {
+        } else if attr_str.contains("prefix")
+            || attr_str.contains("method")
+            || attr_str.contains("path")
+        {
             // Parse component args: #[component(prefix = "/api", method = "POST", path = "/{id}")]
             let args = parse_macro_input!(attr as ComponentArgs);
 
@@ -74,7 +77,10 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             };
 
-            let method = args.method.map(|m| m.value()).unwrap_or_else(|| "GET".to_string());
+            let method = args
+                .method
+                .map(|m| m.value())
+                .unwrap_or_else(|| "GET".to_string());
             (final_path, method)
         } else {
             (format!("/{}", fn_name_str), "GET".to_string())
@@ -106,12 +112,9 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let state_type = if let syn::FnArg::Typed(pat_type) = params[0] {
         &pat_type.ty
     } else {
-        return syn::Error::new_spanned(
-            params[0],
-            "First parameter must be the view state type",
-        )
-        .to_compile_error()
-        .into();
+        return syn::Error::new_spanned(params[0], "First parameter must be the view state type")
+            .to_compile_error()
+            .into();
     };
 
     // Position 1: UrlBuilder (validate it's UrlBuilder)
@@ -122,28 +125,26 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     if !url_builder_valid {
-        return syn::Error::new_spanned(
-            params[1],
-            "Second parameter must be UrlBuilder",
-        )
-        .to_compile_error()
-        .into();
+        return syn::Error::new_spanned(params[1], "Second parameter must be UrlBuilder")
+            .to_compile_error()
+            .into();
     }
 
     // Position 2+: Collect all remaining extractors (no validation)
-    let extractors: Vec<_> = params[2..].iter().enumerate().map(|(idx, param)| {
-        if let syn::FnArg::Typed(pat_type) = param {
-            (idx + 2, pat_type, &pat_type.ty)
-        } else {
-            panic!("Unexpected parameter type");
-        }
-    }).collect();
+    let extractors: Vec<_> = params[2..]
+        .iter()
+        .enumerate()
+        .map(|(idx, param)| {
+            if let syn::FnArg::Typed(pat_type) = param {
+                (idx + 2, pat_type, &pat_type.ty)
+            } else {
+                panic!("Unexpected parameter type");
+            }
+        })
+        .collect();
 
     // Create unique handler name
-    let handler_name = syn::Ident::new(
-        &format!("__htmoxide_handler_{}", fn_name),
-        fn_name.span(),
-    );
+    let handler_name = syn::Ident::new(&format!("__htmoxide_handler_{}", fn_name), fn_name.span());
 
     // Create PascalCase marker type name for ComponentName trait
     let marker_type_name = {
@@ -429,7 +430,11 @@ impl Parse for ComponentArgs {
             }
         }
 
-        Ok(ComponentArgs { prefix, method, path })
+        Ok(ComponentArgs {
+            prefix,
+            method,
+            path,
+        })
     }
 }
 
@@ -440,9 +445,7 @@ fn to_pascal_case(s: &str) -> String {
             let mut chars = word.chars();
             match chars.next() {
                 None => String::new(),
-                Some(first) => {
-                    first.to_uppercase().chain(chars).collect()
-                }
+                Some(first) => first.to_uppercase().chain(chars).collect(),
             }
         })
         .collect()

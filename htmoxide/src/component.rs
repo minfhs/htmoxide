@@ -1,8 +1,4 @@
-use axum::{
-    response::Response,
-    http::Request,
-    body::Body,
-};
+use axum::{body::Body, http::Request, response::Response};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -19,8 +15,18 @@ pub struct ComponentInfo {
 }
 
 impl ComponentInfo {
-    pub const fn new(name: &'static str, path: &'static str, handler: ComponentHandler, method: &'static str) -> Self {
-        Self { name, path, handler, method }
+    pub const fn new(
+        name: &'static str,
+        path: &'static str,
+        handler: ComponentHandler,
+        method: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            path,
+            handler,
+            method,
+        }
     }
 }
 

@@ -1,11 +1,10 @@
 use axum::{
-    Router,
-    routing::{get, post, put, delete, patch},
-    Extension,
+    Extension, Router,
+    routing::{delete, get, patch, post, put},
 };
-use tower_http::services::ServeDir;
-use tower_cookies::CookieManagerLayer;
 use std::sync::Arc;
+use tower_cookies::CookieManagerLayer;
+use tower_http::services::ServeDir;
 
 /// Create a new application with auto-registered components
 ///
@@ -38,7 +37,10 @@ pub fn app() -> Router {
 
     // Register all components from the global registry
     for component in inventory::iter::<crate::ComponentInfo> {
-        println!("Registering component: {} at {} ({})", component.name, component.path, component.method);
+        println!(
+            "Registering component: {} at {} ({})",
+            component.name, component.path, component.method
+        );
         let handler = component.handler;
 
         // Route based on HTTP method
@@ -67,7 +69,7 @@ pub trait RouterExt<S>: Sized {
 
     /// Add static file serving
     fn static_files(self, path: &str, dir: &str) -> Self;
-    
+
     /// Add application state that components can access via Extension<Arc<AppState>>
     fn app_state<AppState>(self, state: Arc<AppState>) -> Self
     where
@@ -89,7 +91,7 @@ where
     fn static_files(self, path: &str, dir: &str) -> Self {
         self.nest_service(path, ServeDir::new(dir))
     }
-    
+
     fn app_state<AppState>(self, state: Arc<AppState>) -> Self
     where
         AppState: Clone + Send + Sync + 'static,
@@ -179,12 +181,7 @@ where
         let config = Arc::new(config);
         self.layer(axum::middleware::from_fn(move |cookies, request, next| {
             let config = config.clone();
-            crate::state_urls_middleware::state_urls_middleware_impl(
-                config,
-                cookies,
-                request,
-                next,
-            )
+            crate::state_urls_middleware::state_urls_middleware_impl(config, cookies, request, next)
         }))
     }
 }

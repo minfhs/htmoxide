@@ -1,9 +1,9 @@
 use serde::de::DeserializeOwned;
-use tower_cookies::Cookies;
 use std::collections::HashMap;
+use tower_cookies::Cookies;
 
 /// Helper for loading component state from cookies and URL parameters
-/// 
+///
 /// This handles the common pattern of:
 /// 1. Load default state
 /// 2. Override with values from cookies
@@ -23,7 +23,7 @@ impl StateLoader {
     }
 
     /// Load state with cookie fallback and URL override
-    /// 
+    ///
     /// Priority order (highest to lowest):
     /// 1. URL query parameters (bookmarkable)
     /// 2. Cookies (persistence)
@@ -34,43 +34,46 @@ impl StateLoader {
     {
         // Start with default state
         let mut state = T::default();
-        
+
         // Try to serialize to JSON to access individual fields
         if let Ok(mut state_json) = serde_json::to_value(&state)
-            && let Some(state_obj) = state_json.as_object_mut() {
-                if let Ok(default_json) = serde_json::to_value(T::default())
-                    && let Some(default_obj) = default_json.as_object() {
-                        // For each field, check cookies first, then query params
-                        for (key, default_value) in default_obj {
-                            let mut current_value = default_value.clone();
+            && let Some(state_obj) = state_json.as_object_mut()
+        {
+            if let Ok(default_json) = serde_json::to_value(T::default())
+                && let Some(default_obj) = default_json.as_object()
+            {
+                // For each field, check cookies first, then query params
+                for (key, default_value) in default_obj {
+                    let mut current_value = default_value.clone();
 
-                            // First, try to load from cookie
-                            if let Some(cookie) = self.cookies.get(key) {
-                                let cookie_value = cookie.value();
-                                if let Some(parsed) = Self::parse_value(cookie_value) {
-                                    current_value = parsed;
-                                }
-                            }
-
-                            // Then, override with query param if present
-                            if let Some(query_value) = self.query_params.get(key)
-                                && let Some(parsed) = Self::parse_value(query_value) {
-                                    current_value = parsed;
-                                }
-
-                            state_obj.insert(key.clone(), current_value);
+                    // First, try to load from cookie
+                    if let Some(cookie) = self.cookies.get(key) {
+                        let cookie_value = cookie.value();
+                        if let Some(parsed) = Self::parse_value(cookie_value) {
+                            current_value = parsed;
                         }
                     }
 
-                // Deserialize back to state
-                if let Ok(new_state) = serde_json::from_value(state_json) {
-                    state = new_state;
+                    // Then, override with query param if present
+                    if let Some(query_value) = self.query_params.get(key)
+                        && let Some(parsed) = Self::parse_value(query_value)
+                    {
+                        current_value = parsed;
+                    }
+
+                    state_obj.insert(key.clone(), current_value);
                 }
             }
-        
+
+            // Deserialize back to state
+            if let Ok(new_state) = serde_json::from_value(state_json) {
+                state = new_state;
+            }
+        }
+
         state
     }
-    
+
     /// Parse a string value into a JSON value
     fn parse_value(value: &str) -> Option<serde_json::Value> {
         if let Ok(num) = value.parse::<i64>() {

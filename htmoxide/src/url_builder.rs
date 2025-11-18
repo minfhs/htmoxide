@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 
 /// Trait for getting a component's name at compile time
 pub trait ComponentName {
@@ -101,7 +101,8 @@ impl UrlBuilder {
     /// Build the final URL with all parameters
     pub fn build(self) -> String {
         // Filter out empty values AND empty keys
-        let filtered_params: HashMap<_, _> = self.all_params
+        let filtered_params: HashMap<_, _> = self
+            .all_params
             .into_iter()
             .filter(|(k, v)| !k.is_empty() && !v.is_empty())
             .collect();
@@ -110,8 +111,7 @@ impl UrlBuilder {
             return self.path;
         }
 
-        let query_string = serde_urlencoded::to_string(&filtered_params)
-            .unwrap_or_default();
+        let query_string = serde_urlencoded::to_string(&filtered_params).unwrap_or_default();
 
         if query_string.is_empty() {
             self.path
@@ -125,7 +125,8 @@ impl UrlBuilder {
         let main_page = self.main_page_path.unwrap_or_else(|| "/".to_string());
 
         // Filter out empty values AND empty keys
-        let filtered_params: HashMap<_, _> = self.all_params
+        let filtered_params: HashMap<_, _> = self
+            .all_params
             .into_iter()
             .filter(|(k, v)| !k.is_empty() && !v.is_empty())
             .collect();
@@ -134,8 +135,7 @@ impl UrlBuilder {
             return main_page;
         }
 
-        let query_string = serde_urlencoded::to_string(&filtered_params)
-            .unwrap_or_default();
+        let query_string = serde_urlencoded::to_string(&filtered_params).unwrap_or_default();
 
         if query_string.is_empty() {
             main_page
@@ -149,7 +149,8 @@ impl UrlBuilder {
         let page_path = page_path.into();
 
         // Filter out empty values AND empty keys
-        let filtered_params: HashMap<_, _> = self.all_params
+        let filtered_params: HashMap<_, _> = self
+            .all_params
             .into_iter()
             .filter(|(k, v)| !k.is_empty() && !v.is_empty())
             .collect();
@@ -158,8 +159,7 @@ impl UrlBuilder {
             return page_path;
         }
 
-        let query_string = serde_urlencoded::to_string(&filtered_params)
-            .unwrap_or_default();
+        let query_string = serde_urlencoded::to_string(&filtered_params).unwrap_or_default();
 
         if query_string.is_empty() {
             page_path

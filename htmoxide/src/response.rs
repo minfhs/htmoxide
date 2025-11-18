@@ -1,6 +1,6 @@
 use axum::{
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    http::{StatusCode, HeaderValue},
 };
 use maud::{Markup, Render};
 
@@ -13,13 +13,19 @@ pub struct Html {
 
 impl From<Markup> for Html {
     fn from(markup: Markup) -> Self {
-        Html { markup, push_url: None }
+        Html {
+            markup,
+            push_url: None,
+        }
     }
 }
 
 impl Html {
     pub fn new(markup: Markup) -> Self {
-        Html { markup, push_url: None }
+        Html {
+            markup,
+            push_url: None,
+        }
     }
 
     pub fn with_push_url(mut self, url: String) -> Self {
@@ -45,9 +51,10 @@ impl IntoResponse for Html {
 
         // Add HX-Push-Url header if specified
         if let Some(push_url) = self.push_url
-            && let Ok(header_value) = HeaderValue::from_str(&push_url) {
-                response.headers_mut().insert("HX-Push-Url", header_value);
-            }
+            && let Ok(header_value) = HeaderValue::from_str(&push_url)
+        {
+            response.headers_mut().insert("HX-Push-Url", header_value);
+        }
 
         response
     }

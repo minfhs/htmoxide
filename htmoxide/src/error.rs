@@ -9,6 +9,8 @@ use std::fmt;
 pub enum HtmoxideError {
     InvalidQueryString(String),
     Extraction { status: StatusCode },
+    UnresolvedPathParameters(Vec<String>),
+    QuerySerialization(String),
 }
 
 impl fmt::Display for HtmoxideError {
@@ -19,6 +21,12 @@ impl fmt::Display for HtmoxideError {
             }
             Self::Extraction { status } => {
                 write!(f, "Extractor failed with status {status}")
+            }
+            Self::UnresolvedPathParameters(params) => {
+                write!(f, "Unresolved path parameters: {:?}", params)
+            }
+            Self::QuerySerialization(message) => {
+                write!(f, "Failed to serialize query parameters: {message}")
             }
         }
     }
@@ -37,6 +45,8 @@ impl HtmoxideError {
     }
 }
 
+// Implement IntoResponse for HtmoxideError so handlers that return a response
+// directly can still propagate htmoxide errors without requiring a Result<T, E> return type.
 impl IntoResponse for HtmoxideError {
     fn into_response(self) -> Response {
         match self {
@@ -46,6 +56,14 @@ impl IntoResponse for HtmoxideError {
 
             HtmoxideError::Extraction { status } => {
                 (status, "Request extraction failed").into_response()
+            }
+            HtmoxideError::UnresolvedPathParameters(params) => (
+                StatusCode::BAD_REQUEST,
+                format!("Unresolved path parameters: {:?}", params),
+            )
+                .into_response(),
+            HtmoxideError::QuerySerialization(message) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
             }
         }
     }

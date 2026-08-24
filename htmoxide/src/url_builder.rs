@@ -1,6 +1,8 @@
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
+use crate::error::HtmoxideError;
+
 /// Trait for getting a component's name at compile time
 pub trait ComponentName {
     fn name() -> &'static str;
@@ -25,8 +27,7 @@ pub fn component_route(component_name: &str) -> Option<&'static str> {
 }
 
 impl UrlBuilder {
-    pub fn new(path: impl Into<String>, query_string: &str) -> Self {
-        let all_params = parse_query_string(query_string);
+    pub fn new(path: impl Into<String>, all_params: HashMap<String, String>) -> Self {
         Self {
             path: path.into(),
             all_params,
@@ -187,14 +188,12 @@ impl UrlBuilder {
     }
 }
 
-fn parse_query_string(query: &str) -> HashMap<String, String> {
+pub fn parse_query_string(query: &str) -> Result<HashMap<String, String>, HtmoxideError> {
     if query.is_empty() {
-        return HashMap::new();
+        return Ok(HashMap::new());
     }
 
     serde_urlencoded::from_str::<Vec<(String, String)>>(query)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|(k, _)| !k.is_empty())
-        .collect()
+        .map(|params| params.into_iter().filter(|(k, _)| !k.is_empty()).collect())
+        .map_err(|e| HtmoxideError::InvalidQueryString(e.to_string()))
 }

@@ -192,19 +192,9 @@ fn parse_query_string(query: &str) -> HashMap<String, String> {
         return HashMap::new();
     }
 
-    query
-        .split('&')
-        .filter_map(|pair| {
-            if pair.is_empty() {
-                return None;
-            }
-            let mut parts = pair.splitn(2, '=');
-            let key = parts.next()?.to_string();
-            if key.is_empty() {
-                return None;
-            }
-            let value = parts.next().unwrap_or("").to_string();
-            Some((key, value))
-        })
+    serde_urlencoded::from_str::<Vec<(String, String)>>(query)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|(k, _)| !k.is_empty())
         .collect()
 }

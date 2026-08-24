@@ -146,7 +146,7 @@ impl UrlBuilder {
 
     /// Build URL for a specific page path (for hx-push-url)
     pub fn build_page_url(self, page_path: impl Into<String>) -> String {
-        let page_path = page_path.into();
+        let mut page_path = page_path.into();
 
         // Filter out empty values AND empty keys
         let filtered_params: HashMap<_, _> = self
@@ -155,11 +155,23 @@ impl UrlBuilder {
             .filter(|(k, v)| !k.is_empty() && !v.is_empty())
             .collect();
 
-        if filtered_params.is_empty() {
+        // Substitute {key} placeholders from params into the page path,
+        // and exclude those from the query string to avoid duplication.
+        let mut remaining_params = HashMap::new();
+        for (key, value) in filtered_params {
+            let placeholder = format!("{{{}}}", key);
+            if page_path.contains(&placeholder) {
+                page_path = page_path.replace(&placeholder, &value);
+            } else {
+                remaining_params.insert(key, value);
+            }
+        }
+
+        if remaining_params.is_empty() {
             return page_path;
         }
 
-        let query_string = serde_urlencoded::to_string(&filtered_params).unwrap_or_default();
+        let query_string = serde_urlencoded::to_string(&remaining_params).unwrap_or_default();
 
         if query_string.is_empty() {
             page_path

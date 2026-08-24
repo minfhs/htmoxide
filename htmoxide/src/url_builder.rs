@@ -35,10 +35,6 @@ impl UrlBuilder {
         }
     }
 
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
     /// Create a new UrlBuilder with a specific main page path for push URL
     pub fn with_main_page(mut self, main_page_path: impl Into<String>) -> Self {
         self.main_page_path = Some(main_page_path.into());

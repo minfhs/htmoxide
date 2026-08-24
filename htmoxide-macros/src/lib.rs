@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{ItemFn, LitStr, Token, parse::Parse, parse::ParseStream, parse_macro_input};
-
 /// Helper to extract the type name from a Type for pattern matching
 fn extract_type_name(ty: &syn::Type) -> String {
     match ty {
@@ -170,7 +169,20 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let call_component = quote! {
-        let result = #fn_name(#(#call_args),*).await;
+        #fn_name(#(#call_args),*).await
+    };
+
+    let returns_result = match &sig.output {
+        syn::ReturnType::Default => false,
+        syn::ReturnType::Type(_, ty) => match ty.as_ref() {
+            syn::Type::Path(type_path) => type_path
+                .path
+                .segments
+                .last()
+                .map(|segment| segment.ident == "Result")
+                .unwrap_or(false),
+            _ => false,
+        },
     };
 
     // Generate extraction code for all extractors
@@ -180,21 +192,35 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let num_extractors = extractors.len();
 
     let parts_extractors: Vec<_> = if num_extractors > 1 {
-        extractors[..num_extractors - 1].iter().map(|(param_idx, _pat, ty)| {
-            let extractor_name = syn::Ident::new(&format!("param_{}", param_idx), fn_name.span());
-            quote! {
-                // Extract from request parts (does not consume body)
-                let #extractor_name = match <#ty as ::axum::extract::FromRequestParts<()>>::from_request_parts(&mut parts, &()).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return ::axum::response::IntoResponse::into_response((
-                            ::axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Failed to extract parameter {}: {:?}", stringify!(#ty), e),
-                        ));
+        extractors[..num_extractors - 1]
+            .iter()
+            .map(|(param_idx, _pat, ty)| {
+                let extractor_name =
+                    syn::Ident::new(&format!("param_{}", param_idx), fn_name.span());
+
+                if returns_result {
+                    quote! {
+                        let #extractor_name =
+                            ::htmoxide::extract::extract_parts::<#ty>(
+                                &mut parts,
+                                &(),
+                            ).await?;
                     }
-                };
-            }
-        }).collect()
+                } else {
+                    quote! {
+                        let #extractor_name =
+                            match ::htmoxide::extract::extract_parts::<#ty>(
+                                &mut parts,
+                                &(),
+                            ).await
+                            {
+                                Ok(value) => value,
+                                Err(error) => return error.into_response(),
+                            };
+                    }
+                }
+            })
+            .collect()
     } else {
         vec![]
     };
@@ -203,39 +229,87 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let last_extractor = if num_extractors > 0 {
         let (param_idx, _pat, ty) = &extractors[num_extractors - 1];
         let extractor_name = syn::Ident::new(&format!("param_{}", param_idx), fn_name.span());
-        let type_name = extract_type_name(ty);
 
-        // Check if this is a Body<T> wrapper (for Form, Json, etc.)
-        if type_name.starts_with("Body<") {
+        if returns_result {
             quote! {
-                // Body<T> extractor: use FromRequest on the request body
                 let req = ::axum::http::Request::from_parts(parts, body);
-                let #extractor_name = match <#ty as ::axum::extract::FromRequest<()>>::from_request(req, &()).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return ::axum::response::IntoResponse::into_response((
-                            ::axum::http::StatusCode::BAD_REQUEST,
-                            format!("Failed to extract body parameter {}: {:?}", stringify!(#ty), e),
-                        ));
-                    }
-                };
+
+                let #extractor_name =
+                    <#ty as ::htmoxide::extract::LastExtract>
+                        ::last_extract(req)
+                        .await?;
             }
         } else {
             quote! {
-                // Regular extractor: use FromRequestParts
-                let #extractor_name = match <#ty as ::axum::extract::FromRequestParts<()>>::from_request_parts(&mut parts, &()).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return ::axum::response::IntoResponse::into_response((
-                            ::axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Failed to extract parameter {}: {:?}", stringify!(#ty), e),
-                        ));
-                    }
-                };
+                let req = ::axum::http::Request::from_parts(parts, body);
+
+                let #extractor_name =
+                    match <#ty as ::htmoxide::extract::LastExtract>
+                        ::last_extract(req)
+                        .await
+                    {
+                        Ok(value) => value,
+                        Err(error) => return error.into_response(),
+                    };
             }
         }
     } else {
         quote! {}
+    };
+
+    let query_parsing = if returns_result {
+        quote! {
+            let all_params =
+                ::htmoxide::url_builder::parse_query_string(&query_string)?;
+        }
+    } else {
+        quote! {
+            let all_params =
+                match ::htmoxide::url_builder::parse_query_string(&query_string) {
+                    Ok(params) => params,
+                    Err(error) => return error.into_response(),
+                };
+        }
+    };
+
+    let handler_body = if returns_result {
+        quote! {
+            let result = async {
+                #query_parsing
+
+                let url_builder = if let Some(page_path) = main_page_path {
+                    ::htmoxide::UrlBuilder::new(#route_path, all_params)
+                        .with_main_page(page_path)
+                } else {
+                    ::htmoxide::UrlBuilder::new(#route_path, all_params)
+                };
+
+                #(#parts_extractors)*
+
+                #last_extractor
+
+                #call_component
+            }.await;
+
+            result.into_response()
+        }
+    } else {
+        quote! {
+            #query_parsing
+
+            let url_builder = if let Some(page_path) = main_page_path {
+                ::htmoxide::UrlBuilder::new(#route_path, all_params)
+                    .with_main_page(page_path)
+            } else {
+                ::htmoxide::UrlBuilder::new(#route_path, all_params)
+            };
+
+            #(#parts_extractors)*
+
+            #last_extractor
+
+            #call_component.into_response()
+        }
     };
 
     // Keep the original component function as-is (no wrapper needed)
@@ -355,22 +429,7 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                     .and_then(|url| url.split('?').next())
                     .map(|path| path.to_string());
 
-                let url_builder = if let Some(page_path) = main_page_path {
-                    ::htmoxide::UrlBuilder::new(#route_path, &query_string).with_main_page(page_path)
-                } else {
-                    ::htmoxide::UrlBuilder::new(#route_path, &query_string)
-                };
-
-                // POSITIONS 2+: Extract all additional Axum extractors
-                // All but last use FromRequestParts, last can use FromRequest (Form, Json)
-                #(#parts_extractors)*
-
-                // Last extractor (supports Form, Json, etc.)
-                #last_extractor
-
-                // Call the component function with all parameters
-                #call_component
-                result.into_response()
+                #handler_body
             })
         }
 

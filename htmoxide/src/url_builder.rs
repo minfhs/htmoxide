@@ -8,6 +8,28 @@ pub trait ComponentName {
     fn name() -> &'static str;
 }
 
+/// Both URLs for an htmx component, produced by `try_build()`.
+///
+/// - `get` — the component endpoint URL, for use in `hx-get`, `hx-post`, etc.
+/// - `push` — the browser address bar URL, for use in `hx-push-url`.
+///
+/// When `fragment_prefix` is configured via `htmoxide::configure()`, `push` is
+/// derived from `get` by stripping that prefix. Otherwise `push` equals `get`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComponentUrl {
+    /// Component endpoint URL (the htmx request target).
+    pub get: String,
+    /// Browser-visible URL (the address bar push target).
+    pub push: String,
+}
+
+// For convenience, allow conversion to a tuple of (get, push)
+impl From<ComponentUrl> for (String, String) {
+    fn from(u: ComponentUrl) -> Self {
+        (u.get, u.push)
+    }
+}
+
 /// Helper for building component URLs with merged query parameters
 #[derive(Clone)]
 pub struct UrlBuilder {
@@ -16,7 +38,7 @@ pub struct UrlBuilder {
     main_page_path: Option<String>,
 }
 
-/// Get the route path for a component by name
+/// Get the full route path for a component by name
 pub fn component_route(component_name: &str) -> Option<&'static str> {
     for component in inventory::iter::<crate::ComponentInfo> {
         if component.name == component_name {
@@ -33,6 +55,11 @@ impl UrlBuilder {
             all_params,
             main_page_path: None,
         }
+    }
+
+    // Get the current path (with unresolved parameters)
+    pub fn path(&self) -> &str {
+        &self.path
     }
 
     /// Create a new UrlBuilder with a specific main page path for push URL
@@ -95,11 +122,55 @@ impl UrlBuilder {
     /// ```
     pub fn with_path_param(mut self, param_name: &str, value: impl ToString) -> Self {
         let placeholder = format!("{{{}}}", param_name);
-        self.path = self.path.replace(&placeholder, &value.to_string());
+        let value = value.to_string();
+
+        self.path = self.path.replace(&placeholder, &value);
+        self.all_params.remove(param_name);
+
         self
     }
 
-    /// Build the final URL with all parameters
+    pub fn try_build(self) -> Result<ComponentUrl, HtmoxideError> {
+        let unresolved = unresolved_path_params(&self.path);
+
+        if !unresolved.is_empty() {
+            return Err(HtmoxideError::UnresolvedPathParameters {
+                path: self.path,
+                params: unresolved,
+            });
+        }
+
+        let filtered_params: HashMap<_, _> = self
+            .all_params
+            .into_iter()
+            .filter(|(k, v)| !k.is_empty() && !v.is_empty())
+            .collect();
+
+        let get = if filtered_params.is_empty() {
+            self.path.clone()
+        } else {
+            let query_string = serde_urlencoded::to_string(&filtered_params)
+                .map_err(|e| HtmoxideError::QuerySerialization(e.to_string()))?;
+
+            if query_string.is_empty() {
+                self.path.clone()
+            } else {
+                format!("{}?{}", self.path, query_string)
+            }
+        };
+
+        let push = match crate::config::fragment_prefix() {
+            Some(prefix) if !prefix.is_empty() => {
+                get.strip_prefix(prefix).unwrap_or(&get).to_string()
+            }
+            _ => get.clone(),
+        };
+
+        Ok(ComponentUrl { get, push })
+    }
+
+    /// Builds the final URL with all parameters.
+    #[deprecated(note = "use `try_build()` to handle URL construction errors")]
     pub fn build(self) -> String {
         // Filter out empty values AND empty keys
         let filtered_params: HashMap<_, _> = self
@@ -122,6 +193,7 @@ impl UrlBuilder {
     }
 
     /// Build URL for the main page (for hx-push-url)
+    #[deprecated(note = "use `try_build()`")]
     pub fn build_main_url(self) -> String {
         let main_page = self.main_page_path.unwrap_or_else(|| "/".to_string());
 
@@ -146,6 +218,7 @@ impl UrlBuilder {
     }
 
     /// Build URL for a specific page path (for hx-push-url)
+    #[deprecated(note = "use `try_build()`")]
     pub fn build_page_url(self, page_path: impl Into<String>) -> String {
         let page_path = page_path.into();
 
@@ -168,7 +241,6 @@ impl UrlBuilder {
             format!("{}?{}", page_path, query_string)
         }
     }
-
     /// Get parameters that are NOT part of the specified state type
     /// This is useful for including other components' params as hidden fields
     pub fn other_params<T: DeserializeOwned>(&self) -> HashMap<String, String> {
@@ -196,4 +268,27 @@ pub fn parse_query_string(query: &str) -> Result<HashMap<String, String>, Htmoxi
     serde_urlencoded::from_str::<Vec<(String, String)>>(query)
         .map(|params| params.into_iter().filter(|(k, _)| !k.is_empty()).collect())
         .map_err(|e| HtmoxideError::InvalidQueryString(e.to_string()))
+}
+
+fn unresolved_path_params(path: &str) -> Vec<String> {
+    let mut params = Vec::new();
+    let mut remaining = path;
+
+    while let Some(start) = remaining.find('{') {
+        let after_start = &remaining[start + 1..];
+
+        let Some(end) = after_start.find('}') else {
+            break;
+        };
+
+        let name = &after_start[..end];
+
+        if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            params.push(name.to_string());
+        }
+
+        remaining = &after_start[end + 1..];
+    }
+
+    params
 }

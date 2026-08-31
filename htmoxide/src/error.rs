@@ -9,7 +9,7 @@ use std::fmt;
 pub enum HtmoxideError {
     InvalidQueryString(String),
     Extraction { status: StatusCode },
-    UnresolvedPathParameters(Vec<String>),
+    UnresolvedPathParameters { path: String, params: Vec<String> },
     QuerySerialization(String),
 }
 
@@ -22,8 +22,12 @@ impl fmt::Display for HtmoxideError {
             Self::Extraction { status } => {
                 write!(f, "Extractor failed with status {status}")
             }
-            Self::UnresolvedPathParameters(params) => {
-                write!(f, "Unresolved path parameters: {:?}", params)
+            Self::UnresolvedPathParameters { path, params } => {
+                write!(
+                    f,
+                    "Unresolved path parameters for path '{}': {:?}",
+                    path, params
+                )
             }
             Self::QuerySerialization(message) => {
                 write!(f, "Failed to serialize query parameters: {message}")
@@ -57,9 +61,12 @@ impl IntoResponse for HtmoxideError {
             HtmoxideError::Extraction { status } => {
                 (status, "Request extraction failed").into_response()
             }
-            HtmoxideError::UnresolvedPathParameters(params) => (
+            HtmoxideError::UnresolvedPathParameters { path, params } => (
                 StatusCode::BAD_REQUEST,
-                format!("Unresolved path parameters: {:?}", params),
+                format!(
+                    "Unresolved path parameters for path '{}': {:?}",
+                    path, params
+                ),
             )
                 .into_response(),
             HtmoxideError::QuerySerialization(message) => {

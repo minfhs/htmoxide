@@ -2,6 +2,7 @@ pub mod app;
 pub mod body;
 pub mod client_helpers;
 pub mod component;
+pub mod config;
 pub mod error;
 pub mod extract;
 pub mod response;
@@ -17,12 +18,13 @@ pub use app::{HtmxRouterExt, RouterExt, app};
 pub use body::Body;
 pub use client_helpers::{clear_input_handler, cookie_cleaner_script, preserve_params};
 pub use component::{Component, ComponentInfo};
+pub use config::{HtmoxideConfig, configure};
 pub use htmoxide_macros::component;
 pub use response::{Html, Page};
 pub use state::StateExtractor;
 pub use state_loader::StateLoader;
 pub use state_urls_middleware::{StateUrlsConfig, state_urls_middleware_impl};
-pub use url_builder::{ComponentName, UrlBuilder};
+pub use url_builder::{ComponentName, ComponentUrl, UrlBuilder};
 
 #[cfg(feature = "qs-forms")]
 pub use qs_form::QsForm;

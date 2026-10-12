@@ -340,7 +340,7 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                 let query_string = parts.uri.query().unwrap_or("").to_string();
 
                 // Extract state from query parameters
-                let mut state = match ::htmoxide::StateExtractor::<#state_type>::from_request_parts(
+                let state = match ::htmoxide::StateExtractor::<#state_type>::from_request_parts(
                     &mut parts,
                     &(),
                 ).await {
@@ -348,79 +348,10 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                     Err(_) => #state_type::default(),
                 };
 
-                // Cookie hydration when persist-state feature is enabled
-                #[cfg(feature = "persist-state")]
-                {
-                    // Extract cookies for state persistence
-                    if let Ok(cookies) = ::htmoxide::tower_cookies::Cookies::from_request_parts(&mut parts, &()).await {
-                        // Merge cookie values into state (query params take priority)
-                        if let (Ok(default_json), Ok(mut state_json)) = (
-                            ::htmoxide::serde_json::to_value(&#state_type::default()),
-                            ::htmoxide::serde_json::to_value(&state)
-                        ) {
-                            if let (Some(default_obj), Some(state_obj)) = (
-                                default_json.as_object(),
-                                state_json.as_object_mut()
-                            ) {
-                                for (key, default_value) in default_obj {
-                                    if let Some(current_value) = state_obj.get(key) {
-                                        if current_value == default_value {
-                                            if let Some(cookie) = cookies.get(key) {
-                                                let cookie_value = cookie.value();
-                                                let parsed_value = if let Ok(num) = cookie_value.parse::<i64>() {
-                                                    Some(::htmoxide::serde_json::Value::Number(num.into()))
-                                                } else if let Ok(num) = cookie_value.parse::<f64>() {
-                                                    ::htmoxide::serde_json::Number::from_f64(num)
-                                                        .map(::htmoxide::serde_json::Value::Number)
-                                                } else if let Ok(b) = cookie_value.parse::<bool>() {
-                                                    Some(::htmoxide::serde_json::Value::Bool(b))
-                                                } else if !cookie_value.is_empty() {
-                                                    Some(::htmoxide::serde_json::Value::String(cookie_value.to_string()))
-                                                } else {
-                                                    None
-                                                };
-                                                if let Some(val) = parsed_value {
-                                                    state_obj.insert(key.clone(), val);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                if let Ok(new_state) = ::htmoxide::serde_json::from_value(state_json) {
-                                    state = new_state;
-                                }
-                            }
-                        }
-
-                        // Save current state to cookies for persistence
-                        if let Ok(state_json) = ::htmoxide::serde_json::to_value(&state) {
-                            if let ::htmoxide::serde_json::Value::Object(ref obj) = state_json {
-                                for (key, value) in obj {
-                                    let cookie_value = if let Some(value_str) = value.as_str() {
-                                        Some(value_str.to_string())
-                                    } else if let Some(value_num) = value.as_i64() {
-                                        Some(value_num.to_string())
-                                    } else if let Some(value_num) = value.as_f64() {
-                                        Some(value_num.to_string())
-                                    } else if let Some(value_bool) = value.as_bool() {
-                                        Some(value_bool.to_string())
-                                    } else {
-                                        None
-                                    };
-                                    if let Some(val) = cookie_value {
-                                        if val.is_empty() {
-                                            cookies.remove(::htmoxide::tower_cookies::Cookie::from(key.to_string()));
-                                        } else {
-                                            let mut cookie = ::htmoxide::tower_cookies::Cookie::new(key.to_string(), val);
-                                            cookie.set_path("/");
-                                            cookies.add(cookie);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                // Merge in cookie values when htmoxide's `persist-state` feature is on.
+                // The feature check lives in htmoxide itself: a `cfg` emitted here would
+                // be evaluated against the *calling* crate's features.
+                let state = ::htmoxide::state::hydrate_from_cookies::<#state_type>(&mut parts, state).await;
 
                 // POSITION 1: Extract UrlBuilder
                 let main_page_path = parts.headers

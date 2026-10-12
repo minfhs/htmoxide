@@ -2,6 +2,8 @@ pub mod app;
 pub mod body;
 pub mod client_helpers;
 pub mod component;
+pub mod error;
+pub mod extract;
 pub mod response;
 pub mod state;
 pub mod state_loader;

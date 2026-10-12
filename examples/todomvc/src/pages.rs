@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::TodoDb;
 use crate::components::{TodoViewState, todo_list};
 use axum::Extension;
@@ -6,7 +8,7 @@ use htmoxide::prelude::*;
 
 pub async fn index_page(Extension(db): Extension<TodoDb>) -> Page {
     let view_state = TodoViewState::default();
-    let todo_list_url = UrlBuilder::new("/todo_list", "");
+    let todo_list_url = UrlBuilder::new("/todo_list", HashMap::new());
 
     html! {
         (maud::DOCTYPE)

@@ -9,7 +9,7 @@ maud = "0.27"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_urlencoded = "0.7"
 tower = "0.5.2"
-tower-http = { version = "0.6.6", features = ["fs"] }
+tower-http = { version = "0.7.1", features = ["fs"] }
 
 [workspace.package]
 version = "0.1.0"
